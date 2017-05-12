@@ -13,12 +13,12 @@ import com.android.volley.toolbox.HurlStack;
 import java.io.File;
 
 /**
- * Created by hal on 5/9/2017.
+ * Created by dbarone on 5/9/2017.
  */
 
-public class LazyVolley {
+public class ForgettableVolley {
 
-    private final String TAG = LazyVolley.class.getName();
+    private final String TAG = ForgettableVolley.class.getName();
 
     private static final int DEFAULT_DISK_USAGE_BYTES = 10 * 1024 * 1024;
     private static final String DEFAULT_CACHE_DIR = "lazy_volley";

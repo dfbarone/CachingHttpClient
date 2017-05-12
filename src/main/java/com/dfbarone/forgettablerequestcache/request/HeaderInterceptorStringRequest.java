@@ -1,7 +1,7 @@
 package com.dfbarone.forgettablerequestcache.request;
 
 /**
- * Created by hal on 5/11/2017.
+ * Created by dbarone on 5/11/2017.
  */
 
 import java.io.UnsupportedEncodingException;

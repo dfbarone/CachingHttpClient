@@ -8,10 +8,10 @@ import com.dfbarone.forgettablerequestcache.request.CacheHeaderInterceptor;
 import java.util.Map;
 
 /**
- * Created by hal on 5/12/2017.
+ * Created by dbarone on 5/12/2017.
  */
 
-public class LazyCachingInterceptor implements CacheHeaderInterceptor {
+public class ForgettableRequestCacheInterceptor implements CacheHeaderInterceptor {
 
     private static final int DEFAULT_SOFT_TTL = 3 * 60 * 1000; // 3m
     private static final int DEFAULT_TTL = 24 * 60 * 60 * 1000; // 24h
@@ -19,12 +19,12 @@ public class LazyCachingInterceptor implements CacheHeaderInterceptor {
     private int mSoftTTL;
     private int mTTL;
 
-    public LazyCachingInterceptor() {
+    public ForgettableRequestCacheInterceptor() {
         mSoftTTL = DEFAULT_SOFT_TTL;
         mTTL = DEFAULT_TTL;
     }
 
-    public LazyCachingInterceptor(int softTTL, int TTL) {
+    public ForgettableRequestCacheInterceptor(int softTTL, int TTL) {
         mSoftTTL = softTTL;
         mTTL = TTL;
     }
