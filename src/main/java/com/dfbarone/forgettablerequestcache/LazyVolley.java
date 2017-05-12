@@ -1,0 +1,52 @@
+package com.dfbarone.forgettablerequestcache;
+
+import android.content.Context;
+
+import com.android.volley.Cache;
+import com.android.volley.Network;
+import com.android.volley.RequestQueue;
+import com.android.volley.toolbox.BasicNetwork;
+import com.android.volley.toolbox.DiskBasedCache;
+import com.android.volley.toolbox.HttpStack;
+import com.android.volley.toolbox.HurlStack;
+
+import java.io.File;
+
+/**
+ * Created by hal on 5/9/2017.
+ */
+
+public class LazyVolley {
+
+    private final String TAG = LazyVolley.class.getName();
+
+    private static final int DEFAULT_DISK_USAGE_BYTES = 10 * 1024 * 1024;
+    private static final String DEFAULT_CACHE_DIR = "lazy_volley";
+
+    public static RequestQueue newRequestQueue(Context context) {
+        return newRequestQueue(context, null, DEFAULT_DISK_USAGE_BYTES);
+    }
+
+    public static RequestQueue newRequestQueue(Context context, HttpStack stack, int DiskCacheSizeInMB) {
+        File cacheDir = new File(getCacheDir(context), DEFAULT_CACHE_DIR);
+        cacheDir.mkdirs();
+        Cache cache = new DiskBasedCache(cacheDir, DiskCacheSizeInMB);
+        if (stack == null) {
+            stack = new HurlStack();
+        }
+        Network network = new BasicNetwork(stack);
+        RequestQueue queue = new RequestQueue(cache, network);
+        queue.start();
+
+        return queue;
+    }
+
+    private static File getCacheDir(Context context) {
+        File rootCache = context.getExternalCacheDir();
+        if (rootCache == null) {
+            rootCache = context.getCacheDir();
+        }
+        return rootCache;
+    }
+
+}
