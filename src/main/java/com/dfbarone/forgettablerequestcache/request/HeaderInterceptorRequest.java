@@ -7,6 +7,10 @@ import com.android.volley.ParseError;
 import com.android.volley.Response;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.JsonRequest;
+import com.dfbarone.forgettablerequestcache.MoshiUtils;
+import com.dfbarone.forgettablerequestcache.request.CacheHeaderInterceptor;
+import com.dfbarone.forgettablerequestcache.request.HeaderInterceptorJsonObjectRequest;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -16,12 +20,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Created by dbarone on 5/11/2017.
+ * Created by hal on 5/20/2017.
  */
 
-public class HeaderInterceptorJsonObjectRequest extends JsonObjectRequest {
+public class HeaderInterceptorRequest<T> extends JsonRequest<T> {
 
     private CacheHeaderInterceptor interceptor;
+    private final Class<T> clazz;
 
     /**
      * Creates a new request.
@@ -32,25 +37,26 @@ public class HeaderInterceptorJsonObjectRequest extends JsonObjectRequest {
      * @param listener Listener to receive the JSON response
      * @param errorListener Error listener, or null to ignore errors.
      */
-    public HeaderInterceptorJsonObjectRequest(int method, String url, JSONObject jsonRequest,
-                                              Response.Listener<JSONObject> listener, Response.ErrorListener errorListener,
+    public HeaderInterceptorRequest(int method, String url, Class<T> clazz, String jsonRequest,
+                                              Response.Listener<T> listener, Response.ErrorListener errorListener,
                                               CacheHeaderInterceptor interceptor) {
         super(method, url, jsonRequest, listener, errorListener);
         this.interceptor = interceptor;
+        this.clazz = clazz;
     }
 
     @Override
-    protected Response<JSONObject> parseNetworkResponse(NetworkResponse response) {
+    protected Response<T> parseNetworkResponse(NetworkResponse response) {
         try {
             String jsonString = new String(response.data, HttpHeaderParser.parseCharset(response.headers, PROTOCOL_CHARSET));
             Cache.Entry entry = interceptor != null ? interceptor.interceptCacheHeader(response) : HttpHeaderParser.parseCacheHeaders(response);
-            JSONObject jsonObject = new JSONObject(jsonString);
-            return Response.success(jsonObject, entry);
+            T convertedPayload = MoshiUtils.parseJSONObject(jsonString, clazz);
+            return Response.success(convertedPayload, entry);
         } catch (UnsupportedEncodingException e) {
             return Response.error(new ParseError(e));
-        } catch (JSONException je) {
-            return Response.error(new ParseError(je));
-        }
+        } //catch (JSONException je) {
+        //   return Response.error(new ParseError(je));
+        //}
     }
 
     @Override
@@ -62,5 +68,9 @@ public class HeaderInterceptorJsonObjectRequest extends JsonObjectRequest {
         headers.put("Content-Type", "application/json");
         headers.putAll(headersSys);
         return headers;
+    }
+
+    public static String getCharSet() {
+        return PROTOCOL_CHARSET;
     }
 }

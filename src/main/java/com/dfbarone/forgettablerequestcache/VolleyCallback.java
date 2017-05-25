@@ -8,7 +8,7 @@ import org.json.JSONObject;
  * Created by dbarone on 5/11/2017.
  */
 
-public interface VolleyCallback {
-    void onSuccess(JSONObject result);
+public interface VolleyCallback<T> {
+    void onSuccess(T result);
     void onError(VolleyError error);
 }
