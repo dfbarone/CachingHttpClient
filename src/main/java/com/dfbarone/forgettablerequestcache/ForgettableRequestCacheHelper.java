@@ -71,7 +71,7 @@ public class ForgettableRequestCacheHelper implements CacheHeaderInterceptor {
                                final String url,
                                final JSONObject payload,
                                final Request.Priority priority,
-                               final VolleyCallback callback,
+                               final VolleyCallback<JSONObject> callback,
                                CacheHeaderInterceptor interceptor) {
 
         HeaderInterceptorJsonObjectRequest jsonRequest = new HeaderInterceptorJsonObjectRequest(method, url, payload,
@@ -91,7 +91,7 @@ public class ForgettableRequestCacheHelper implements CacheHeaderInterceptor {
                     @Override
                     public void onErrorResponse(VolleyError error) {
                         Log.d(TAG, "request onErrorResponse onError " + url);
-                        callback.onError(error);
+                        callback.onError(error, null);
 
                     }
                 }, interceptor
@@ -131,25 +131,22 @@ public class ForgettableRequestCacheHelper implements CacheHeaderInterceptor {
                                     final VolleyCallback<T> callback,
                                     CacheHeaderInterceptor interceptor) {
 
-        /*T t = tryLoadCachedStream(url, clazz);
-        if (t != null) {
-            Log.d(TAG, "request cached onSuccess " + url);
-            callback.onSuccess(t);
-        }*/
-
         final HeaderInterceptorRequest<T> jsonRequest = new HeaderInterceptorRequest<T>(method, url, clazz, payload,
                 new Response.Listener<T>() {
                     @Override
                     public void onResponse(T response) {
-                        Log.d(TAG, "request onResponse onSuccess " + url);
+                        Log.d(TAG, "requestMoshi " + url);
                         callback.onSuccess(response);
                     }
                 },
                 new Response.ErrorListener() {
                     @Override
                     public void onErrorResponse(VolleyError error) {
-                        Log.d(TAG, onErrorMessage(error) + " " + url);
-                        callback.onError(error);
+                        Log.d(TAG, "requestMoshi " + onErrorMessage(error) + " " + url);
+
+                        final T payload = tryLoadCachedRequest(url, clazz);
+
+                        callback.onError(error, payload);
 
                     }
                 }, interceptor){
@@ -160,11 +157,11 @@ public class ForgettableRequestCacheHelper implements CacheHeaderInterceptor {
             }
         };
 
-        /*if (timeout > 0) { }*/
+        /*if (timeout > 0) { }
             jsonRequest.setRetryPolicy(new DefaultRetryPolicy(
                     10*1000,
                     10,
-                    DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+                    DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));*/
 
 
         mRequestQueue.add(jsonRequest);
@@ -199,7 +196,7 @@ public class ForgettableRequestCacheHelper implements CacheHeaderInterceptor {
         return jsonString;
     }
 
-    private <T> T tryLoadCachedStream(String url, Class<T> clazz) {
+    private <T> T tryLoadCachedRequest(String url, Class<T> clazz) {
 
         // Try to load the last request for this stream from http cache
         Cache.Entry e = mRequestQueue.getCache().get(url);

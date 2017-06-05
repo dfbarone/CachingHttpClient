@@ -10,5 +10,5 @@ import org.json.JSONObject;
 
 public interface VolleyCallback<T> {
     void onSuccess(T result);
-    void onError(VolleyError error);
+    void onError(VolleyError error, T result);
 }
