@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 
-    package="com.dfbarone.forgettablerequestcache">
+    package="com.dfbarone.lazyrequestcache">
 
     <application
         android:allowBackup="true"
