@@ -33,21 +33,16 @@ android {
         }
     }
     useLibrary 'org.apache.http.legacy'
+
+    packagingOptions {
+        exclude 'META-INF/rxjava.properties'
+    }
 }
 
 ext {
-    //daggerVersion = '2.9'
-    //supportLibraryVersion = '25.0.1'
-    //playServicesVersion = '10.0.1'
-    okhttpVersion = '3.5.0'
-    //retrofitVersion = '2.1.0'
-    //rxAndroidVersion = '1.2.1'
-    //rxJavaVersion = '1.2.5'
-    //yieldmoVersion = '4.1.2'
-    //epoxy = "1.5.0"
-    //leakCanary = "1.5"
-    //outbrain = "2.1.1"
-    //constraint = '1.0.2'
+    okHttpVersion = '3.5.0'
+    rxJavaVersion = '2.0.6'
+    rxAndroidVersion = '2.0.1'
 }
 
 dependencies {
@@ -58,8 +53,12 @@ dependencies {
     testCompile 'junit:junit:4.12'
     compile 'commons-httpclient:commons-httpclient:3.1'
     compile 'com.android.volley:volley:1.0.0'
-    compile "com.squareup.okhttp3:okhttp:$okhttpVersion"
-    compile "com.squareup.okhttp3:logging-interceptor:$okhttpVersion"
+    compile "com.squareup.okhttp3:okhttp:$okHttpVersion"
+    compile "com.squareup.okhttp3:logging-interceptor:$okHttpVersion"
     compile 'com.google.code.gson:gson:2.6.2'
     compile 'com.squareup.moshi:moshi:1.4.0'
+
+    compile "io.reactivex.rxjava2:rxjava:$rxJavaVersion"
+    compile "io.reactivex.rxjava2:rxandroid:$rxAndroidVersion"
+    compile "io.reactivex:rxjava-debug:1.0.3"
 }
