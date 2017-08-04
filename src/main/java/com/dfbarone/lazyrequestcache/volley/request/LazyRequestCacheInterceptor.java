@@ -12,8 +12,8 @@ import java.util.Map;
 
 public class LazyRequestCacheInterceptor implements CacheHeaderInterceptor {
 
-    private static final int DEFAULT_SOFT_TTL = 3 * 60 * 1000; // 3m
-    private static final int DEFAULT_TTL = 24 * 60 * 60 * 1000; // 24h
+    private static final int DEFAULT_SOFT_TTL = 1 * 60 * 1000; // 1m
+    private static final int DEFAULT_TTL = 30 * 24 * 60 * 60 * 1000; // 1month
 
     private int mSoftTTL;
     private int mTTL;

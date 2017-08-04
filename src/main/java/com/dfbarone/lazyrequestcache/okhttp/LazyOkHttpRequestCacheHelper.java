@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.dfbarone.lazyrequestcache.IHttpClient;
 import com.dfbarone.lazyrequestcache.json.MoshiUtils;
 import com.dfbarone.lazyrequestcache.volley.VolleyCallback;
 
@@ -22,7 +23,7 @@ import okhttp3.Response;
  * Created by dominicbarone on 6/19/17.
  */
 
-public class LazyOkHttpRequestCacheHelper implements Interceptor {
+public class LazyOkHttpRequestCacheHelper implements IHttpClient, Interceptor {
 
     /**
      * Dangerous interceptor that rewrites the server's cache-control header.
@@ -32,7 +33,7 @@ public class LazyOkHttpRequestCacheHelper implements Interceptor {
         public Response intercept(Interceptor.Chain chain) throws IOException {
             Response originalResponse = chain.proceed(chain.request());
             return originalResponse.newBuilder()
-                    .header("Cache-Control", "max-age=" + 60 * 60 * 24 * 365)
+                    .header("Cache-Control", "public, max-age=" + 60 + ", max-stale=" + 60*60*24 )
                     .build();
         }
     };
@@ -90,7 +91,12 @@ public class LazyOkHttpRequestCacheHelper implements Interceptor {
                     .header("Content-Type", "application/json")
                     .build();
 
-            mHttpClient.newCall(request).enqueue(new Callback() {
+            OkHttpClient client = mHttpClient.newBuilder()
+                .addNetworkInterceptor(REWRITE_CACHE_CONTROL_INTERCEPTOR)
+                .build();
+
+            client.newCall(request).enqueue(new Callback() {
+
                 @Override
                 public void onFailure(Call call, IOException e) {
                     callback.onError(null, null);

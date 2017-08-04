@@ -17,6 +17,7 @@ import com.android.volley.TimeoutError;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.RequestFuture;
+import com.dfbarone.lazyrequestcache.IHttpClient;
 import com.dfbarone.lazyrequestcache.json.MoshiUtils;
 import com.dfbarone.lazyrequestcache.volley.request.CacheHeaderInterceptor;
 import com.dfbarone.lazyrequestcache.volley.request.HeaderInterceptorRequest;
@@ -34,7 +35,7 @@ import io.reactivex.Single;
  * Created by dbarone on 5/12/2017.
  */
 
-public class LazyRequestCacheHelper implements CacheHeaderInterceptor {
+public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderInterceptor {
 
     private final String TAG = LazyRequestCacheHelper.class.getSimpleName();
 
