@@ -6,7 +6,7 @@ import com.squareup.moshi.JsonAdapter;
 import com.squareup.moshi.Moshi;
 
 /**
- * Created by hal on 5/20/2017.
+ * Created by dbarone on 5/20/2017.
  */
 
 public class MoshiUtils {

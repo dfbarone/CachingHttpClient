@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Created by hal on 5/20/2017.
+ * Created by dbarone on 5/20/2017.
  */
 
 public class HeaderInterceptorRequest<T> extends JsonRequest<T> {
