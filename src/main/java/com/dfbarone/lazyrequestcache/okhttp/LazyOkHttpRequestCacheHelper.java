@@ -10,6 +10,7 @@ import com.dfbarone.lazyrequestcache.json.MoshiUtils;
 import com.dfbarone.lazyrequestcache.volley.VolleyCallback;
 
 import java.io.IOException;
+import java.util.Map;
 
 import okhttp3.CacheControl;
 import okhttp3.Call;
@@ -65,6 +66,7 @@ public class LazyOkHttpRequestCacheHelper implements IHttpClient, Interceptor {
     }
 
     public <T> void requestMoshi(final int method,
+                                 final Map<String, String> header,
                                  final String url,
                                  final Class<T> clazz,
                                  final String payload,
@@ -72,10 +74,11 @@ public class LazyOkHttpRequestCacheHelper implements IHttpClient, Interceptor {
                                  final int timeout,
                                  final VolleyCallback callback) {
 
-        requestMoshi(method, url, clazz, payload, priority, timeout, callback, this);
+        requestMoshi(method, header, url, clazz, payload, priority, timeout, callback, this);
     }
 
     protected <T> void requestMoshi(final int method,
+                                    final Map<String, String> header,
                                     final String url,
                                     final Class<T> clazz,
                                     final String payload,
@@ -85,14 +88,15 @@ public class LazyOkHttpRequestCacheHelper implements IHttpClient, Interceptor {
                                     Interceptor interceptor) {
 
         try {
-            Request request = new Request.Builder()
-                    .url(url)
-                    .header("Accept", "application/json; version=3.0")
-                    .header("Content-Type", "application/json")
-                    .build();
+            Request.Builder requestBuilder = new Request.Builder();
+            requestBuilder.url(url);
+            for (String key : header.keySet()) {
+                requestBuilder.addHeader(key, header.get(key));
+            }
+            Request request = requestBuilder.build();
 
             OkHttpClient client = mHttpClient.newBuilder()
-                .addNetworkInterceptor(REWRITE_CACHE_CONTROL_INTERCEPTOR)
+                .addNetworkInterceptor(interceptor)
                 .build();
 
             client.newCall(request).enqueue(new Callback() {

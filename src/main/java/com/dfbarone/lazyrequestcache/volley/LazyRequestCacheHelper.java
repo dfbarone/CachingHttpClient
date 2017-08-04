@@ -25,6 +25,7 @@ import com.dfbarone.lazyrequestcache.volley.request.HeaderInterceptorStringReque
 import com.dfbarone.lazyrequestcache.volley.request.LazyRequestCacheInterceptor;
 
 import java.io.UnsupportedEncodingException;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -199,6 +200,7 @@ public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderIntercept
 
     // Get method
     public <T> void requestMoshi(final int method,
+                                 final Map<String, String> header,
                                  final String url,
                                  final Class<T> clazz,
                                  final String payload,
@@ -206,10 +208,11 @@ public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderIntercept
                                  final int timeout,
                                  final VolleyCallback callback) {
 
-        requestMoshi(method, url, clazz, payload, priority, timeout, callback, this);
+        requestMoshi(method, header, url, clazz, payload, priority, timeout, callback, this);
     }
 
     protected <T> void requestMoshi(final int method,
+                                    final Map<String, String> header,
                                     final String url,
                                     final Class<T> clazz,
                                     final String payload,
@@ -218,7 +221,7 @@ public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderIntercept
                                     final VolleyCallback<T> callback,
                                     CacheHeaderInterceptor interceptor) {
 
-        final HeaderInterceptorRequest<T> jsonRequest = new HeaderInterceptorRequest<T>(method, url, clazz, payload,
+        final HeaderInterceptorRequest<T> jsonRequest = new HeaderInterceptorRequest<T>(method, header, url, clazz, payload,
                 new Response.Listener<T>() {
                     @Override
                     public void onResponse(T response) {

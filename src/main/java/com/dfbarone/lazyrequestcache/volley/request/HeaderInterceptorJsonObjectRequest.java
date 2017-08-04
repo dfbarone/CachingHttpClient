@@ -22,6 +22,7 @@ import java.util.Map;
 public class HeaderInterceptorJsonObjectRequest extends JsonObjectRequest {
 
     private CacheHeaderInterceptor interceptor;
+    private Map<String, String> mHeaders;
 
     /**
      * Creates a new request.
@@ -32,11 +33,12 @@ public class HeaderInterceptorJsonObjectRequest extends JsonObjectRequest {
      * @param listener Listener to receive the JSON response
      * @param errorListener Error listener, or null to ignore errors.
      */
-    public HeaderInterceptorJsonObjectRequest(int method, String url, JSONObject jsonRequest,
+    public HeaderInterceptorJsonObjectRequest(int method, Map<String, String> headers, String url, JSONObject jsonRequest,
                                               Response.Listener<JSONObject> listener, Response.ErrorListener errorListener,
                                               CacheHeaderInterceptor interceptor) {
         super(method, url, jsonRequest, listener, errorListener);
         this.interceptor = interceptor;
+        this.mHeaders = headers;
     }
 
     @Override
@@ -58,8 +60,9 @@ public class HeaderInterceptorJsonObjectRequest extends JsonObjectRequest {
         Map<String, String> headersSys = super.getHeaders();
         Map<String, String> headers = new HashMap<>();
         headersSys.remove("Accept");
-        headers.put("Accept", "application/json; version=3.0");
-        headers.put("Content-Type", "application/json");
+        for (String key : mHeaders.keySet()) {
+            headers.put(key, mHeaders.get(key));
+        }
         headers.putAll(headersSys);
         return headers;
     }
