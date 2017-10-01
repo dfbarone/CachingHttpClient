@@ -17,8 +17,7 @@ import com.android.volley.TimeoutError;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.RequestFuture;
-import com.dfbarone.lazyrequestcache.IHttpClient;
-import com.dfbarone.lazyrequestcache.json.MoshiUtils;
+import com.dfbarone.lazyrequestcache.json.JsonConverter;
 import com.dfbarone.lazyrequestcache.volley.request.CacheHeaderInterceptor;
 import com.dfbarone.lazyrequestcache.volley.request.HeaderInterceptorRequest;
 import com.dfbarone.lazyrequestcache.volley.request.HeaderInterceptorStringRequest;
@@ -26,17 +25,20 @@ import com.dfbarone.lazyrequestcache.volley.request.LazyRequestCacheInterceptor;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import io.reactivex.Observable;
 import io.reactivex.Single;
+import okhttp3.Interceptor;
 
 /**
  * Created by dbarone on 5/12/2017.
  */
 
-public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderInterceptor {
+public class LazyRequestCacheHelper implements /*IHttpClient,*/ CacheHeaderInterceptor {
 
     private final String TAG = LazyRequestCacheHelper.class.getSimpleName();
 
@@ -199,26 +201,30 @@ public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderIntercept
     }*/
 
     // Get method
-    public <T> void requestMoshi(final int method,
-                                 final Map<String, String> header,
-                                 final String url,
-                                 final Class<T> clazz,
-                                 final String payload,
-                                 final Request.Priority priority,
-                                 final int timeout,
-                                 final VolleyCallback callback) {
+    public <T> Observable<T> requestMoshi(final int method,
+                                          final Map<String, String> header,
+                                          final String url,
+                                          final Class<T> clazz,
+                                          final String payload,
+                                          final Request.Priority priority,
+                                          final int timeout) {
 
-        requestMoshi(method, header, url, clazz, payload, priority, timeout, callback, this);
+        final CacheHeaderInterceptor interceptor = this;
+        return Observable.fromCallable(new Callable<T>() {
+            @Override
+            public T call() throws Exception {
+                return requestMoshi(method, header, url, clazz, payload, priority, timeout, interceptor);
+            }
+        });
     }
 
-    protected <T> void requestMoshi(final int method,
+    protected <T> T requestMoshi(final int method,
                                     final Map<String, String> header,
                                     final String url,
                                     final Class<T> clazz,
                                     final String payload,
                                     final Request.Priority priority,
                                     int timeout,
-                                    final VolleyCallback<T> callback,
                                     CacheHeaderInterceptor interceptor) {
 
         final HeaderInterceptorRequest<T> jsonRequest = new HeaderInterceptorRequest<T>(method, header, url, clazz, payload,
@@ -226,7 +232,7 @@ public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderIntercept
                     @Override
                     public void onResponse(T response) {
                         //Log.d(TAG, "requestMoshi - success. " + url);
-                        callback.onSuccess(response);
+                        //callback.onSuccess(response);
                     }
                 },
                 new Response.ErrorListener() {
@@ -235,12 +241,12 @@ public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderIntercept
                         final T payload = loadCachedResponseToMoshi(url, clazz);
                         if (payload != null) {
                             Log.d(TAG, "requestMoshi - error. return cached response " + url);
-                            callback.onSuccess(payload);
+                            //callback.onSuccess(payload);
                         } else {
                             Log.d(TAG, "requestMoshi - error. " + onErrorMessage(error) + " " + url);
                         }
 
-                        callback.onError(error, payload);
+                        //callback.onError(error, payload);
 
                     }
                 }, interceptor) {
@@ -258,6 +264,8 @@ public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderIntercept
                     DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));*/
 
         mHttpClient.add(jsonRequest);
+
+        return null;
     }
 
     public String onErrorMessage(VolleyError error) {
@@ -314,7 +322,7 @@ public class LazyRequestCacheHelper implements IHttpClient, CacheHeaderIntercept
         // Try to load the last request for this stream from http cache
         String payload = loadCachedResponseToString(url);
         if (payload != null) {
-            T s = MoshiUtils.parseJSONObject(payload, clazz);
+            T s = JsonConverter.gsonFromJson(payload, clazz);
             return s;
         }
         return null;

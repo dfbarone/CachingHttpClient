@@ -7,7 +7,7 @@ import com.android.volley.ParseError;
 import com.android.volley.Response;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.JsonRequest;
-import com.dfbarone.lazyrequestcache.json.MoshiUtils;
+import com.dfbarone.lazyrequestcache.json.JsonConverter;
 
 import org.json.JSONObject;
 
@@ -48,7 +48,7 @@ public class HeaderInterceptorRequest<T> extends JsonRequest<T> {
         try {
             String jsonString = new String(response.data, HttpHeaderParser.parseCharset(response.headers, PROTOCOL_CHARSET));
             Cache.Entry entry = interceptor != null ? interceptor.interceptCacheHeader(response) : HttpHeaderParser.parseCacheHeaders(response);
-            T convertedPayload = MoshiUtils.parseJSONObject(jsonString, clazz);
+            T convertedPayload = JsonConverter.gsonFromJson(jsonString, clazz);
             return Response.success(convertedPayload, entry);
         } catch (UnsupportedEncodingException e) {
             return Response.error(new ParseError(e));
