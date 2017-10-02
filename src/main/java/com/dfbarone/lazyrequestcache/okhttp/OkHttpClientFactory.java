@@ -22,10 +22,10 @@ public class OkHttpClientFactory {
         return okHttpClient(context, DEFAULT_DISK_USAGE_BYTES);
     }
 
-    public static OkHttpClient okHttpClient(Context context, int DiskCacheSizeInMB) {
+    public static OkHttpClient okHttpClient(Context context, int DiskCacheSizeInBytes) {
         File cacheDir = new File(getCacheDir(context), DEFAULT_CACHE_DIR);
         cacheDir.mkdirs();
-        Cache cache = new Cache(cacheDir, DiskCacheSizeInMB);
+        Cache cache = new Cache(cacheDir, DiskCacheSizeInBytes);
 
         OkHttpClient client = new OkHttpClient.Builder()
                 .cache(cache)
