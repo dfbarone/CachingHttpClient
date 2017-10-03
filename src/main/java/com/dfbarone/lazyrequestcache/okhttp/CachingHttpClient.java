@@ -28,13 +28,12 @@ import okhttp3.Response;
 
 public class CachingHttpClient {
 
-    public static final String WARNING_RESPONSE_IS_STALE = "110";
     protected static OkHttpClient mHttpClient;
     private static CachingHttpClient mInstance;
     private static Context mContext;
     public static final String TAG = CachingHttpClient.class.getSimpleName();
-    public static final long MAX_AGE = 60;
-    public static final long MAX_STALE = 60*60*24*365;
+    public static final int MAX_AGE = 60;
+    public static final int MAX_STALE = 60 * 60 * 24 * 365;
 
     public static CachingHttpClient getInstance() {
         if (mInstance == null) {
@@ -46,128 +45,51 @@ public class CachingHttpClient {
     public static void init(Context context) {
         if (mHttpClient == null) {
             mContext = context.getApplicationContext();
-            mHttpClient = OkHttpClientFactory.okHttpClient(context, 16*1000*1000);
+            mHttpClient = OkHttpClientFactory.okHttpClient(context, 16 * 1000 * 1000);
         }
-    }
-
-    public static boolean isStaleResponse(Response response) {
-        // not much we can do in this case
-        if (response == null) {
-            return false;
-        }
-
-        List<String> warningHeaders = response.headers("Warning");
-
-        for (String warningHeader : warningHeaders) {
-            // if we can find a warning header saying that this response is stale, we know
-            // that we can't skip it.
-            if (warningHeader.startsWith(WARNING_RESPONSE_IS_STALE)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public static Request removeCacheHeaders(Request request) {
-        Headers modifiedHeaders = request.headers()
-                .newBuilder()
-                .removeAll("Cache-Control")
-                .build();
-
-        return request.newBuilder()
-                .headers(modifiedHeaders)
-                .build();
-    }
-
-    public static Response rewriteCacheControlIfConnected(Context context, Response originalResponse) {
-        if (!NetworkUtils.isNetworkAvailable(context)) {
-            return setMaxStale(originalResponse);
-        } else {
-            return setMaxAge(originalResponse);
-        }
-    }
-
-    public static Response setMaxStale(Response originalResponse) {
-        return originalResponse.newBuilder()
-                .header("Cache-Control", "public, max-stale=" + MAX_STALE)
-                .build();
-    }
-
-    public static Response setMaxAge(Response originalResponse) {
-        return originalResponse.newBuilder()
-                .header("Cache-Control", "public, max-age=" + MAX_AGE)
-                .build();
     }
 
     /**
      * Interceptor to cache data and maintain it for a minute.
-     *
+     * <p>
      * If the same network request is sent within a minute,
      * the response is retrieved from cache.
      */
-    private static class DefaultInterceptor implements Interceptor {
+    private static class OfflineResponseCacheInterceptor implements Interceptor {
         @Override
         public okhttp3.Response intercept(Chain chain) throws IOException {
-            Log.d(CachingHttpClient.TAG, "DefaultInterceptor " + chain.request().url());
-            Request request = chain.request();
-            Response originalResponse = chain.proceed(request);
-            if (!isStaleResponse(originalResponse)) {
-                return rewriteCacheControlIfConnected(mContext, originalResponse);
-            } else {
-                Request modifiedRequest = removeCacheHeaders(request);
-                try {
-                    Response retriedResponse = chain.proceed(modifiedRequest);
-                    if (retriedResponse == null || !retriedResponse.isSuccessful()) {
-                        return rewriteCacheControlIfConnected(mContext, originalResponse);
-                    }
-                    return rewriteCacheControlIfConnected(mContext, retriedResponse);
-                } catch (IOException e) {
-                    return rewriteCacheControlIfConnected(mContext, originalResponse);
-                }
+            // Use request set to max-age. This should not be needed,
+            // but default request adds max-stale for unknown reasons
+            Request request = chain.request()
+                    .newBuilder()
+                    .header("Cache-Control", "public, max-age=" + MAX_AGE)
+                    .build();
+
+            // If offline, request based on max-stale
+            if (!NetworkUtils.isNetworkAvailable(mContext)) {
+                request = request.newBuilder()
+                        .header("Cache-Control", "public, max-stale=" + MAX_STALE)
+                        .build();
             }
+
+            return chain.proceed(request);
         }
     }
 
     /**
-     * Interceptor to cache data and maintain it for four weeks.
-     *
-     * If the device is offline, stale (at most four weeks old)
-     * response is fetched from the cache.
+     * Interceptor to cache data and maintain it MAX_AGE
+     * <p>
+     * If the same network request is sent within a minute,
+     * the response is retrieved from cache.
      */
-    private static class NetworkInterceptor implements Interceptor {
+    private static class ResponseCacheNetworkInterceptor implements Interceptor {
         @Override
         public okhttp3.Response intercept(Chain chain) throws IOException {
-            Log.d(CachingHttpClient.TAG, "NetworkInterceptor " + chain.request().url());
-            Request request = chain.request();
-            Response originalResponse = chain.proceed(request);
-            if (!isStaleResponse(originalResponse)) {
-                return rewriteCacheControlIfConnected(mContext, originalResponse);
-            } else {
-                Request modifiedRequest = removeCacheHeaders(request);
-                try {
-                    Response retriedResponse = chain.proceed(modifiedRequest);
-                    if (retriedResponse == null || !retriedResponse.isSuccessful()) {
-                        return rewriteCacheControlIfConnected(mContext, originalResponse);
-                    }
-                    return rewriteCacheControlIfConnected(mContext, retriedResponse);
-                } catch (IOException e) {
-                    return rewriteCacheControlIfConnected(mContext, originalResponse);
-                }
-            }
+            Response originalResponse = chain.proceed(chain.request());
+            return originalResponse.newBuilder()
+                    .header("Cache-Control", "public, max-age=" + MAX_AGE)
+                    .build();
         }
-    }
-
-    private static String responseToString(Response response) {
-        String payload = null;
-        try {
-            if (response != null) {
-                payload = new String(response.body().bytes(), "UTF-8");
-                response.close();
-            }
-        } catch (Exception e) {
-        }
-        return payload;
     }
 
     public Response newCall(Request cachingRequest) {
@@ -179,12 +101,12 @@ public class CachingHttpClient {
         requestBuilder.headers(cachingRequest.headers());
         requestBuilder.method(cachingRequest.method(), cachingRequest.body());
 
+        // Don't add interceptors when looking in cache for responses
         if (cachingRequest.cacheControl().onlyIfCached()) {
-            // Only look in cache for response
             requestBuilder.cacheControl(CacheControl.FORCE_NETWORK);
         } else {
-            clientBuilder.addNetworkInterceptor(new NetworkInterceptor())
-                    .addInterceptor(new DefaultInterceptor());
+            clientBuilder.addNetworkInterceptor(new ResponseCacheNetworkInterceptor())
+                    .addInterceptor(new OfflineResponseCacheInterceptor());
         }
 
         Request request = requestBuilder.build();
@@ -194,9 +116,9 @@ public class CachingHttpClient {
         try {
             response = call.execute();
             if (response.cacheResponse() != null && response.networkResponse() == null) {
-                Log.d(TAG, "get  cached " + cachingRequest.url());
+                Log.d(TAG, "get  cached " + response.cacheResponse().code() + " " + cachingRequest.url());
             } else if (response.networkResponse() != null) {
-                Log.d(TAG, "get network " + cachingRequest.url());
+                Log.d(TAG, "get network " + response.networkResponse().code() + " " + cachingRequest.url());
             } else {
                 Log.d(TAG, "get     bad " + cachingRequest.url());
             }
@@ -214,7 +136,7 @@ public class CachingHttpClient {
         String payload = null;
         try {
             Response response = newCall(cachingRequest);
-            payload = responseToString(response);
+            payload = OkHttpUtils.responseToString(response);
             response.close();
         } catch (IllegalArgumentException e) {
             Log.d(TAG, "getString error " + e.getMessage());
@@ -238,7 +160,8 @@ public class CachingHttpClient {
                 }
             }
         } catch (Exception e) {
-            Log.d(TAG, "wtf " + e.getStackTrace());
+            Log.d(TAG, "wtf " + e.getMessage());
+            e.printStackTrace();
             //throw e;
         }
         return null;
