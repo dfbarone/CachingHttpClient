@@ -68,7 +68,7 @@ public class CachingHttpClient {
             // If offline, request based on max-stale
             if (!NetworkUtils.isNetworkAvailable(mContext)) {
                 request = request.newBuilder()
-                        .header("Cache-Control", "public, max-stale=" + MAX_STALE)
+                        .header("Cache-Control", "public, only-if-cached, max-stale=" + MAX_STALE)
                         .build();
             }
 
