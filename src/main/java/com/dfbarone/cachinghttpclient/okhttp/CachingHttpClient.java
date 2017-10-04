@@ -7,9 +7,11 @@ import com.dfbarone.cachinghttpclient.json.JsonConverter;
 import com.dfbarone.cachinghttpclient.utils.NetworkUtils;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import okhttp3.CacheControl;
 import okhttp3.Call;
+import okhttp3.ConnectionPool;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -21,25 +23,20 @@ import okhttp3.Response;
 
 public class CachingHttpClient {
 
-    protected static OkHttpClient mHttpClient;
-    private static CachingHttpClient mInstance;
+    protected OkHttpClient mHttpClient;
     private static Context mContext;
     public static final String TAG = CachingHttpClient.class.getSimpleName();
     public static final int MAX_AGE = 60;
     public static final int MAX_STALE = 60 * 60 * 24 * 365;
 
-    public static CachingHttpClient getInstance() {
-        if (mInstance == null) {
-            mInstance = new CachingHttpClient();
-        }
-        return mInstance;
+    public CachingHttpClient(Context context) {
+        mContext = context.getApplicationContext();
+        mHttpClient = OkHttpClientFactory.okHttpClient(context);
     }
 
-    public static void init(Context context) {
-        if (mHttpClient == null) {
-            mContext = context.getApplicationContext();
-            mHttpClient = OkHttpClientFactory.okHttpClient(context, 16 * 1000 * 1000);
-        }
+    public CachingHttpClient(Context context, OkHttpClient okHttpClient) {
+        mContext = context.getApplicationContext();
+        mHttpClient = okHttpClient;
     }
 
     /**
@@ -102,9 +99,18 @@ public class CachingHttpClient {
                     .addInterceptor(new OfflineResponseCacheInterceptor());
         }
 
-        Request request = requestBuilder.build();
+        if (cachingRequest.method().equalsIgnoreCase("get")) {
+            // Customizing a connection pool is a major kludge. Switching networks
+            // will cause old socket connections to not get killed. The workaround is to
+            // set the connection pool below.
+            // https://github.com/square/okhttp/issues/3146
+            clientBuilder.retryOnConnectionFailure(true)
+                .connectTimeout(10, TimeUnit.SECONDS)
+                    .readTimeout(10, TimeUnit.SECONDS)
+                    .connectionPool(new ConnectionPool(0, 1, TimeUnit.NANOSECONDS));
+        }
 
-        Call call = clientBuilder.build().newCall(request);
+        Call call = clientBuilder.build().newCall(requestBuilder.build());
         Response response = null;
         try {
             response = call.execute();
@@ -161,7 +167,6 @@ public class CachingHttpClient {
     }
 
     public boolean isExpired(Request cachingRequest, long timeToLive) {
-
         boolean expired = true;
         try {
             Response response = newCall(cachingRequest);
