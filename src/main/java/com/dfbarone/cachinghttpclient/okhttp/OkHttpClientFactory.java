@@ -1,4 +1,4 @@
-package com.dfbarone.lazyrequestcache.okhttp;
+package com.dfbarone.cachinghttpclient.okhttp;
 
 import android.content.Context;
 

@@ -1,8 +1,8 @@
-package com.dfbarone.lazyrequestcache.okhttp;
+package com.dfbarone.cachinghttpclient.okhttp;
 
 import android.content.Context;
 
-import com.dfbarone.lazyrequestcache.utils.NetworkUtils;
+import com.dfbarone.cachinghttpclient.utils.NetworkUtils;
 
 import java.util.List;
 

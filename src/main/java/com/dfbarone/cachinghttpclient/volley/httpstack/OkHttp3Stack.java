@@ -1,4 +1,4 @@
-package com.dfbarone.lazyrequestcache.volley.httpstack;
+package com.dfbarone.cachinghttpclient.volley.httpstack;
 
 import com.android.volley.AuthFailureError;
 import com.android.volley.Request;

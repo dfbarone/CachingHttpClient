@@ -1,4 +1,4 @@
-package com.dfbarone.lazyrequestcache.json;
+package com.dfbarone.cachinghttpclient.json;
 
 import android.util.Log;
 

@@ -1,22 +1,15 @@
-package com.dfbarone.lazyrequestcache.okhttp;
+package com.dfbarone.cachinghttpclient.okhttp;
 
 import android.content.Context;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.util.Log;
 
-import com.dfbarone.lazyrequestcache.json.JsonConverter;
-import com.dfbarone.lazyrequestcache.utils.NetworkUtils;
+import com.dfbarone.cachinghttpclient.json.JsonConverter;
+import com.dfbarone.cachinghttpclient.utils.NetworkUtils;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
 
-import io.reactivex.Observable;
 import okhttp3.CacheControl;
 import okhttp3.Call;
-import okhttp3.Headers;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;

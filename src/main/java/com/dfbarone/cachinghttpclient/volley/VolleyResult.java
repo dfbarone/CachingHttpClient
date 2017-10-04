@@ -1,4 +1,4 @@
-package com.dfbarone.lazyrequestcache.volley;
+package com.dfbarone.cachinghttpclient.volley;
 
 import com.android.volley.VolleyError;
 

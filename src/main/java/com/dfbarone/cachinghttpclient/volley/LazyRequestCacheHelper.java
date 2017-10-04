@@ -1,4 +1,4 @@
-package com.dfbarone.lazyrequestcache.volley;
+package com.dfbarone.cachinghttpclient.volley;
 
 import android.content.Context;
 import android.util.Log;
@@ -17,11 +17,11 @@ import com.android.volley.TimeoutError;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.RequestFuture;
-import com.dfbarone.lazyrequestcache.json.JsonConverter;
-import com.dfbarone.lazyrequestcache.volley.request.CacheHeaderInterceptor;
-import com.dfbarone.lazyrequestcache.volley.request.HeaderInterceptorRequest;
-import com.dfbarone.lazyrequestcache.volley.request.HeaderInterceptorStringRequest;
-import com.dfbarone.lazyrequestcache.volley.request.LazyRequestCacheInterceptor;
+import com.dfbarone.cachinghttpclient.json.JsonConverter;
+import com.dfbarone.cachinghttpclient.volley.request.CacheHeaderInterceptor;
+import com.dfbarone.cachinghttpclient.volley.request.HeaderInterceptorRequest;
+import com.dfbarone.cachinghttpclient.volley.request.HeaderInterceptorStringRequest;
+import com.dfbarone.cachinghttpclient.volley.request.LazyRequestCacheInterceptor;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Map;
@@ -32,7 +32,6 @@ import java.util.concurrent.TimeoutException;
 
 import io.reactivex.Observable;
 import io.reactivex.Single;
-import okhttp3.Interceptor;
 
 /**
  * Created by dbarone on 5/12/2017.

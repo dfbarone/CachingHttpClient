@@ -1,4 +1,4 @@
-package com.dfbarone.lazyrequestcache.volley;
+package com.dfbarone.cachinghttpclient.volley;
 
 import android.content.Context;
 

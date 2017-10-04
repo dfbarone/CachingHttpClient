@@ -1,4 +1,4 @@
-package com.dfbarone.lazyrequestcache.utils;
+package com.dfbarone.cachinghttpclient.utils;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
