@@ -26,8 +26,8 @@ public class CachingHttpClient {
     protected OkHttpClient mHttpClient;
     private static Context mContext;
     public static final String TAG = CachingHttpClient.class.getSimpleName();
-    public static final int MAX_AGE = 60;
-    public static final int MAX_STALE = 60 * 60 * 24 * 365;
+    public static final long MAX_AGE = 60;
+    public static final long MAX_STALE = 60 * 60 * 24 * 365;
 
     public CachingHttpClient(Context context) {
         mContext = context.getApplicationContext();
@@ -48,20 +48,13 @@ public class CachingHttpClient {
     private static class OfflineResponseCacheInterceptor implements Interceptor {
         @Override
         public okhttp3.Response intercept(Chain chain) throws IOException {
-            // Use request set to max-age. This should not be needed,
-            // but default request adds max-stale for unknown reasons
-            Request request = chain.request()
-                    .newBuilder()
-                    .header("Cache-Control", "public, max-age=" + MAX_AGE)
-                    .build();
-
+            Request request = chain.request();
             // If offline, request based on max-stale
             if (!NetworkUtils.isNetworkAvailable(mContext)) {
                 request = request.newBuilder()
                         .header("Cache-Control", "public, only-if-cached, max-stale=" + MAX_STALE)
                         .build();
             }
-
             return chain.proceed(request);
         }
     }
@@ -82,59 +75,54 @@ public class CachingHttpClient {
         }
     }
 
-    public Response newCall(Request cachingRequest) {
-
+    public Call newCall(Request request) {
         OkHttpClient.Builder clientBuilder = mHttpClient.newBuilder();
-
-        Request.Builder requestBuilder = new Request.Builder();
-        requestBuilder.url(cachingRequest.url());
-        requestBuilder.headers(cachingRequest.headers());
-        requestBuilder.method(cachingRequest.method(), cachingRequest.body());
-
-        // Don't add interceptors when looking in cache for responses
-        if (cachingRequest.cacheControl().onlyIfCached()) {
-            requestBuilder.cacheControl(CacheControl.FORCE_NETWORK);
-        } else {
+        // When FORCE_CACHE is not set
+        if (!request.cacheControl().onlyIfCached()) {
+            // Add interceptors
             clientBuilder.addNetworkInterceptor(new ResponseCacheNetworkInterceptor())
                     .addInterceptor(new OfflineResponseCacheInterceptor());
-        }
 
-        if (cachingRequest.method().equalsIgnoreCase("get")) {
-            // Customizing a connection pool is a major kludge. Switching networks
-            // will cause old socket connections to not get killed. The workaround is to
-            // set the connection pool below.
-            // https://github.com/square/okhttp/issues/3146
-            clientBuilder.retryOnConnectionFailure(true)
-                .connectTimeout(10, TimeUnit.SECONDS)
-                    .readTimeout(10, TimeUnit.SECONDS)
-                    .connectionPool(new ConnectionPool(0, 1, TimeUnit.NANOSECONDS));
+            // When making get calls...
+            if (request.method().equalsIgnoreCase("get")) {
+                // Customizing a connection pool is a major kludge. Switching networks
+                // will cause old socket connections to not get killed. The workaround is to
+                // set the connection pool below.
+                // https://github.com/square/okhttp/issues/3146
+                clientBuilder.retryOnConnectionFailure(true)
+                        .connectTimeout(10, TimeUnit.SECONDS)
+                        .readTimeout(10, TimeUnit.SECONDS)
+                        .connectionPool(new ConnectionPool(0, 1, TimeUnit.NANOSECONDS));
+            }
         }
+        return clientBuilder.build().newCall(request);
+    }
 
-        Call call = clientBuilder.build().newCall(requestBuilder.build());
-        Response response = null;
+    public Response getResponse(Request request) {
         try {
-            response = call.execute();
-            if (response.cacheResponse() != null && response.networkResponse() == null) {
-                Log.d(TAG, "get  cached " + response.cacheResponse().code() + " " + cachingRequest.url());
-            } else if (response.networkResponse() != null) {
-                Log.d(TAG, "get network " + response.networkResponse().code() + " " + cachingRequest.url());
+            Call call = newCall(request);
+            Response response = call.execute();
+            if (response.networkResponse() != null) {
+                Log.d(TAG, "get network " + response.networkResponse().code() + " " + request.url());
+            } else if (response.cacheResponse() != null) {
+                Log.d(TAG, "get  cached " + response.cacheResponse().code() + " " + request.url());
             } else {
-                Log.d(TAG, "get     bad " + cachingRequest.url());
+                Log.d(TAG, "get     bad " + request.url());
             }
             //response.close();
+            return response;
         } catch (IOException e) {
             Log.d(TAG, "get error " + e.getMessage() + e.getStackTrace());
         } catch (IllegalArgumentException e) {
             Log.d(TAG, "get error " + e.getMessage() + e.getStackTrace());
         }
-        return response;
+        return null;
     }
 
-    public String newCallString(Request cachingRequest) {
-
+    public String getString(Request cachingRequest) {
         String payload = null;
         try {
-            Response response = newCall(cachingRequest);
+            Response response = getResponse(cachingRequest);
             payload = OkHttpUtils.responseToString(response);
             response.close();
         } catch (IllegalArgumentException e) {
@@ -143,9 +131,8 @@ public class CachingHttpClient {
         return payload;
     }
 
-    public <T> T newCall(final Request cachingRequest, final Class<T> clazz) throws IOException {
-        Response response = newCall(cachingRequest);
-
+    public <T> T get(final Request cachingRequest, final Class<T> clazz) throws IOException {
+        Response response = getResponse(cachingRequest);
         T s = null;
         try {
             String payload = new String(response.body().bytes(), "UTF-8");
@@ -169,7 +156,11 @@ public class CachingHttpClient {
     public boolean isExpired(Request cachingRequest, long timeToLive) {
         boolean expired = true;
         try {
-            Response response = newCall(cachingRequest);
+            // Checking if a response is expired requires getting from cache only
+            Response response = getResponse(cachingRequest.newBuilder()
+                    .cacheControl(CacheControl.FORCE_CACHE)
+                    .build());
+
             if (response.networkResponse() == null && response.cacheResponse() != null) {
                 Long diff = (System.currentTimeMillis() - response.sentRequestAtMillis()) / 1000;
                 if (diff < timeToLive) {
