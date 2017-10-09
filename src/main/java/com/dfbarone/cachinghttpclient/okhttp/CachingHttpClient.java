@@ -102,12 +102,15 @@ public class CachingHttpClient {
         try {
             Call call = newCall(request);
             Response response = call.execute();
-            if (response.networkResponse() != null) {
-                Log.d(TAG, "get network " + response.networkResponse().code() + " " + request.url());
+            String responseCode = "";
+            if (response.networkResponse() != null && response.cacheResponse() != null) {
+                Log.d(TAG, "get cond'tnl " + response.code() + " " + request.url());
+            } else if (response.networkResponse() != null) {
+                Log.d(TAG, "get  network " + response.code() + " " + request.url());
             } else if (response.cacheResponse() != null) {
-                Log.d(TAG, "get  cached " + response.cacheResponse().code() + " " + request.url());
+                Log.d(TAG, "get   cached " + response.code() + " " + request.url());
             } else {
-                Log.d(TAG, "get     bad " + request.url());
+                Log.d(TAG, "get      bad " + response.code() + " " + request.url());
             }
             //response.close();
             return response;
