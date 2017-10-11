@@ -26,8 +26,8 @@ public class CachingHttpClient {
     protected OkHttpClient mHttpClient;
     private static Context mContext;
     public static final String TAG = CachingHttpClient.class.getSimpleName();
-    public static final long MAX_AGE = 60;
-    public static final long MAX_STALE = 60 * 60 * 24 * 365;
+    public static final int MAX_AGE = 60;
+    public static final int MAX_STALE = 60 * 60 * 24 * 365;
 
     public CachingHttpClient(Context context) {
         mContext = context.getApplicationContext();
@@ -46,13 +46,20 @@ public class CachingHttpClient {
      * the response is retrieved from cache.
      */
     private static class OfflineResponseCacheInterceptor implements Interceptor {
+
+        private int mMaxStale;
+
+        public OfflineResponseCacheInterceptor(int maxStale) {
+            mMaxStale = maxStale;
+        }
+
         @Override
         public okhttp3.Response intercept(Chain chain) throws IOException {
             Request request = chain.request();
             // If offline, request based on max-stale
             if (!NetworkUtils.isNetworkAvailable(mContext)) {
                 request = request.newBuilder()
-                        .header("Cache-Control", "public, only-if-cached, max-stale=" + MAX_STALE)
+                        .header("Cache-Control", "public, only-if-cached, max-stale=" + mMaxStale)
                         .build();
             }
             return chain.proceed(request);
@@ -66,11 +73,18 @@ public class CachingHttpClient {
      * the response is retrieved from cache.
      */
     private static class ResponseCacheNetworkInterceptor implements Interceptor {
+
+        private int mMaxAge;
+
+        public ResponseCacheNetworkInterceptor(int maxAge) {
+            mMaxAge = maxAge;
+        }
+
         @Override
         public okhttp3.Response intercept(Chain chain) throws IOException {
             Response originalResponse = chain.proceed(chain.request());
             return originalResponse.newBuilder()
-                    .header("Cache-Control", "public, max-age=" + MAX_AGE)
+                    .header("Cache-Control", "public, max-age=" + mMaxAge)
                     .build();
         }
     }
@@ -80,10 +94,11 @@ public class CachingHttpClient {
         // When FORCE_CACHE is not set
         if (!request.cacheControl().onlyIfCached()) {
             // Add interceptors
-            clientBuilder.addNetworkInterceptor(new ResponseCacheNetworkInterceptor())
-                    .addInterceptor(new OfflineResponseCacheInterceptor());
+            clientBuilder
+                    .addNetworkInterceptor(new ResponseCacheNetworkInterceptor(request.cacheControl().maxAgeSeconds()))
+                    .addInterceptor(new OfflineResponseCacheInterceptor(MAX_STALE));
 
-            // When making get calls...
+            // When making GET calls...
             if (request.method().equalsIgnoreCase("get")) {
                 // Customizing a connection pool is a major kludge. Switching networks
                 // will cause old socket connections to not get killed. The workaround is to
@@ -102,7 +117,6 @@ public class CachingHttpClient {
         try {
             Call call = newCall(request);
             Response response = call.execute();
-            String responseCode = "";
             if (response.networkResponse() != null && response.cacheResponse() != null) {
                 Log.d(TAG, "get cond'tnl " + response.code() + " " + request.url());
             } else if (response.networkResponse() != null) {
@@ -122,10 +136,10 @@ public class CachingHttpClient {
         return null;
     }
 
-    public String getString(Request cachingRequest) {
+    public String getString(Request request) {
         String payload = null;
         try {
-            Response response = getResponse(cachingRequest);
+            Response response = getResponse(request);
             payload = OkHttpUtils.responseToString(response);
             response.close();
         } catch (IllegalArgumentException e) {
@@ -134,16 +148,15 @@ public class CachingHttpClient {
         return payload;
     }
 
-    public <T> T get(final Request cachingRequest, final Class<T> clazz) throws IOException {
-        Response response = getResponse(cachingRequest);
-        T s = null;
+    public <T> T get(final Request request, final Class<T> clazz) throws IOException {
+        Response response = getResponse(request);
+        T payloadT = null;
         try {
             String payload = new String(response.body().bytes(), "UTF-8");
             if (payload != null) {
-                //Log.d(TAG, payload);
-                s = JsonConverter.moshiFromJson(payload, clazz);
-                if (s != null) {
-                    return s;
+                payloadT = JsonConverter.moshiFromJson(payload, clazz);
+                if (payloadT != null) {
+                    return payloadT;
                 } else {
                     throw new IOException("badness");
                 }
@@ -153,25 +166,27 @@ public class CachingHttpClient {
             e.printStackTrace();
             //throw e;
         }
-        return null;
+        return payloadT;
     }
 
-    public boolean isExpired(Request cachingRequest, long timeToLive) {
+    public boolean isExpired(Request request) {
         boolean expired = true;
         try {
             // Checking if a response is expired requires getting from cache only
-            Response response = getResponse(cachingRequest.newBuilder()
-                    .cacheControl(CacheControl.FORCE_CACHE)
-                    .build());
+            Response response = getResponse(request.newBuilder()
+                    .cacheControl(new CacheControl.Builder()
+                            .onlyIfCached()
+                            .maxAge(request.cacheControl().maxAgeSeconds(), TimeUnit.SECONDS)
+                            .build())
+                    .build()
+            );
 
-            if (response.networkResponse() == null && response.cacheResponse() != null) {
-                Long diff = (System.currentTimeMillis() - response.sentRequestAtMillis()) / 1000;
-                if (diff < timeToLive) {
-                    expired = false;
-                }
-                Log.d(TAG, "isExpired " + expired + " " + diff + "s elapsed " + cachingRequest.url());
+            if (response != null && response.isSuccessful()) {
+                long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
+                expired = false;
+                Log.d(TAG, "isExpired false " + diff + "s elapsed " + request.url());
             } else {
-                Log.d(TAG, "isExpired request not cached" + cachingRequest.url());
+                Log.d(TAG, "isExpired true " + request.url());
             }
             response.close();
         } catch (IllegalArgumentException e) {
