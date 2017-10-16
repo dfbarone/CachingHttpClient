@@ -3,8 +3,12 @@ package com.dfbarone.cachinghttpclient.json;
 import android.util.Log;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import com.squareup.moshi.JsonAdapter;
 import com.squareup.moshi.Moshi;
+
+import java.io.IOException;
+import java.util.IllegalFormatException;
 
 /**
  * Created by dbarone on 5/20/2017.
@@ -20,7 +24,7 @@ public class JsonConverter {
             Moshi moshi = new Moshi.Builder().build();
             JsonAdapter<T> jsonAdapter = moshi.adapter(clazz);
             var = jsonAdapter.fromJson(jsonString);
-        } catch (Exception e) {
+        } catch (IOException e) {
             Log.d(TAG, e.getMessage());
         }
         return var;
@@ -31,7 +35,7 @@ public class JsonConverter {
         try {
             Gson gson = new Gson();
             var = gson.fromJson(jsonString, clazz);
-        } catch (Exception e) {
+        } catch (JsonSyntaxException e) {
             Log.d(TAG, e.getMessage());
         }
         return var;

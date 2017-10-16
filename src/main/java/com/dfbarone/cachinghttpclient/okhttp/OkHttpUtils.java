@@ -4,6 +4,8 @@ import android.content.Context;
 
 import com.dfbarone.cachinghttpclient.utils.NetworkUtils;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 
 import okhttp3.Headers;
@@ -70,7 +72,10 @@ public class OkHttpUtils {
                 payload = new String(response.body().bytes(), "UTF-8");
                 response.close();
             }
-        } catch (Exception e) {
+        } catch (UnsupportedEncodingException e) {
+
+        } catch (IOException e) {
+
         }
         return payload;
     }

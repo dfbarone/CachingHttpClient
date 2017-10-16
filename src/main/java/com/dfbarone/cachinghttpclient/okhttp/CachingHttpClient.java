@@ -7,8 +7,11 @@ import com.dfbarone.cachinghttpclient.json.JsonConverter;
 import com.dfbarone.cachinghttpclient.utils.NetworkUtils;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
+import io.reactivex.Observable;
+import io.reactivex.Single;
 import okhttp3.CacheControl;
 import okhttp3.Call;
 import okhttp3.ConnectionPool;
@@ -23,11 +26,11 @@ import okhttp3.Response;
 
 public class CachingHttpClient {
 
-    protected OkHttpClient mHttpClient;
+    private OkHttpClient mHttpClient;
     private static Context mContext;
-    public static final String TAG = CachingHttpClient.class.getSimpleName();
-    public static final int MAX_AGE = 60;
-    public static final int MAX_STALE = 60 * 60 * 24 * 365;
+    private static final String TAG = CachingHttpClient.class.getSimpleName();
+    private static final int MAX_AGE = 60;
+    private static final int MAX_STALE = 60 * 60 * 24 * 365;
 
     public CachingHttpClient(Context context) {
         mContext = context.getApplicationContext();
@@ -89,7 +92,7 @@ public class CachingHttpClient {
         }
     }
 
-    public Call newCall(Request request) {
+    private Call newCall(Request request) {
         OkHttpClient.Builder clientBuilder = mHttpClient.newBuilder();
         // When FORCE_CACHE is not set
         if (!request.cacheControl().onlyIfCached()) {
@@ -113,7 +116,7 @@ public class CachingHttpClient {
         return clientBuilder.build().newCall(request);
     }
 
-    public Response getResponse(Request request) {
+    public Response getResponse(Request request) throws IOException {
         try {
             Call call = newCall(request);
             Response response = call.execute();
@@ -129,14 +132,15 @@ public class CachingHttpClient {
             //response.close();
             return response;
         } catch (IOException e) {
-            Log.d(TAG, "get error " + e.getMessage() + e.getStackTrace());
+            Log.d(TAG, "getResponse error " + e.getMessage() + e.getStackTrace());
+            throw e;
         } catch (IllegalArgumentException e) {
-            Log.d(TAG, "get error " + e.getMessage() + e.getStackTrace());
+            Log.d(TAG, "getResponse error " + e.getMessage() + e.getStackTrace());
         }
         return null;
     }
 
-    public String getString(Request request) {
+    public String getString(Request request) throws IOException {
         String payload = null;
         try {
             Response response = getResponse(request);
@@ -146,6 +150,15 @@ public class CachingHttpClient {
             Log.d(TAG, "getString error " + e.getMessage());
         }
         return payload;
+    }
+
+    public Single<String> getStringAsync(final Request request) {
+        return Single.fromCallable(new Callable<String>() {
+            @Override
+            public String call() throws IOException {
+                return getString(request);
+            }
+        });
     }
 
     public <T> T get(final Request request, final Class<T> clazz) throws IOException {
@@ -161,12 +174,19 @@ public class CachingHttpClient {
                     throw new IOException("badness");
                 }
             }
-        } catch (Exception e) {
-            Log.d(TAG, "wtf " + e.getMessage());
-            e.printStackTrace();
-            //throw e;
+        } catch (IllegalArgumentException e) {
+            Log.d(TAG, "get error " + e.getMessage());
         }
         return payloadT;
+    }
+
+    public <T> Single<T> getAsync(final Request request, final Class<T> clazz) {
+        return Single.fromCallable(new Callable<T>() {
+            @Override
+            public T call() throws IOException {
+                return get(request, clazz);
+            }
+        });
     }
 
     public boolean isExpired(Request request) {
@@ -189,7 +209,7 @@ public class CachingHttpClient {
                 Log.d(TAG, "isExpired true " + request.url());
             }
             response.close();
-        } catch (IllegalArgumentException e) {
+        } catch (IOException e) {
             Log.d(TAG, "isExpired error " + e.getMessage());
         }
         return expired;
