@@ -132,12 +132,40 @@ public class CachingHttpClient {
             //response.close();
             return response;
         } catch (IOException e) {
-            Log.d(TAG, "getResponse error " + e.getMessage() + e.getStackTrace());
+            Log.d(TAG, "getResponse error " + e.getMessage());
+            e.printStackTrace();
             throw e;
         } catch (IllegalArgumentException e) {
-            Log.d(TAG, "getResponse error " + e.getMessage() + e.getStackTrace());
+            Log.d(TAG, "getResponse error " + e.getMessage());
+            e.printStackTrace();
         }
         return null;
+    }
+
+    public boolean isExpired(Request request) {
+        boolean expired = true;
+        try {
+            // Checking if a response is expired requires getting from cache only
+            Response response = getResponse(request.newBuilder()
+                    .cacheControl(new CacheControl.Builder()
+                            .onlyIfCached()
+                            .maxAge(request.cacheControl().maxAgeSeconds(), TimeUnit.SECONDS)
+                            .build())
+                    .build()
+            );
+
+            if (response != null && response.isSuccessful()) {
+                long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
+                expired = false;
+                Log.d(TAG, "isExpired false " + diff + "s elapsed " + request.url());
+            } else {
+                Log.d(TAG, "isExpired true " + request.url());
+            }
+            response.close();
+        } catch (IOException e) {
+            Log.d(TAG, "isExpired error " + e.getMessage());
+        }
+        return expired;
     }
 
     public String getString(Request request) throws IOException {
@@ -189,30 +217,48 @@ public class CachingHttpClient {
         });
     }
 
-    public boolean isExpired(Request request) {
-        boolean expired = true;
-        try {
-            // Checking if a response is expired requires getting from cache only
-            Response response = getResponse(request.newBuilder()
-                    .cacheControl(new CacheControl.Builder()
-                            .onlyIfCached()
-                            .maxAge(request.cacheControl().maxAgeSeconds(), TimeUnit.SECONDS)
-                            .build())
-                    .build()
-            );
+    public String fetchString(Request request) throws IOException {
+        Request newRequest = request.newBuilder()
+                .cacheControl(new CacheControl.Builder()
+                        .noCache()
+                        .maxAge(request.cacheControl().maxAgeSeconds(), TimeUnit.SECONDS)
+                        .build())
+                .build();
 
-            if (response != null && response.isSuccessful()) {
-                long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
-                expired = false;
-                Log.d(TAG, "isExpired false " + diff + "s elapsed " + request.url());
-            } else {
-                Log.d(TAG, "isExpired true " + request.url());
-            }
-            response.close();
-        } catch (IOException e) {
-            Log.d(TAG, "isExpired error " + e.getMessage());
-        }
-        return expired;
+        return getString(newRequest);
+    }
+
+    public Single<String> fetchStringAsync(Request request) {
+        Request newRequest = request.newBuilder()
+                .cacheControl(new CacheControl.Builder()
+                        .noCache()
+                        .maxAge(request.cacheControl().maxAgeSeconds(), TimeUnit.SECONDS)
+                        .build())
+                .build();
+
+        return getStringAsync(newRequest);
+    }
+
+    public <T> T fetch(final Request request, final Class<T> clazz) throws IOException {
+        Request newRequest = request.newBuilder()
+                .cacheControl(new CacheControl.Builder()
+                        .noCache()
+                        .maxAge(request.cacheControl().maxAgeSeconds(), TimeUnit.SECONDS)
+                        .build())
+                .build();
+
+        return get(newRequest, clazz);
+    }
+
+    public <T> Single<T> fetchAsync(final Request request, final Class<T> clazz) {
+        Request newRequest = request.newBuilder()
+                .cacheControl(new CacheControl.Builder()
+                        .noCache()
+                        .maxAge(request.cacheControl().maxAgeSeconds(), TimeUnit.SECONDS)
+                        .build())
+                .build();
+
+        return getAsync(newRequest, clazz);
     }
 
 }
