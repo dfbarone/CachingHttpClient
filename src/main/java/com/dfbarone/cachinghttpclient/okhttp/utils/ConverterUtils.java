@@ -1,4 +1,4 @@
-package com.dfbarone.cachinghttpclient.json;
+package com.dfbarone.cachinghttpclient.okhttp.utils;
 
 import android.util.Log;
 
@@ -8,15 +8,32 @@ import com.squareup.moshi.JsonAdapter;
 import com.squareup.moshi.Moshi;
 
 import java.io.IOException;
-import java.util.IllegalFormatException;
+import java.io.UnsupportedEncodingException;
+
+import okhttp3.Response;
 
 /**
- * Created by dbarone on 5/20/2017.
+ * Created by hal on 10/17/2017.
  */
 
-public class JsonConverter {
+public class ConverterUtils {
 
-    public static final String TAG = JsonConverter.class.getSimpleName();
+    public static final String TAG = ConverterUtils.class.getSimpleName();
+
+    public static String responseToString(Response response) {
+        String payload = null;
+        try {
+            if (response != null) {
+                payload = new String(response.body().bytes(), "UTF-8");
+                response.close();
+            }
+        } catch (UnsupportedEncodingException e) {
+
+        } catch (IOException e) {
+
+        }
+        return payload;
+    }
 
     public static <T> T moshiFromJson(final String jsonString, Class<T> clazz) {
         T var = null;

@@ -1,4 +1,4 @@
-package com.dfbarone.cachinghttpclient.utils;
+package com.dfbarone.cachinghttpclient.okhttp.utils;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
