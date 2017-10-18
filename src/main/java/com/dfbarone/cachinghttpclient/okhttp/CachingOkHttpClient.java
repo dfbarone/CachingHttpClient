@@ -30,16 +30,27 @@ public class CachingOkHttpClient {
     private OkHttpClient okHttpClient;
     private static final String TAG = CachingOkHttpClient.class.getSimpleName();
     private int maxAgeSeconds;
+    private Context context;
 
     public CachingOkHttpClient(Context context) {
+        this.context = context;
         Builder builder = new Builder(context);
         okHttpClient = builder.okHttpClientBuilder.build();
         maxAgeSeconds = builder.maxAgeSeconds;
     }
 
     private CachingOkHttpClient(Builder builder) {
+        this.context = builder.context;
         okHttpClient = builder.okHttpClientBuilder.build();
         maxAgeSeconds = builder.maxAgeSeconds;
+    }
+
+    public OkHttpClient okHttpClient() {
+        return okHttpClient;
+    }
+
+    public CachingOkHttpClient.Builder newBuilder() {
+        return new Builder(this);
     }
 
     /**
@@ -175,13 +186,20 @@ public class CachingOkHttpClient {
             this.maxAgeSeconds = MAX_AGE_SECONDS;
         }
 
+        public Builder(CachingOkHttpClient cachingOkHttpClient) {
+            this.context = cachingOkHttpClient.context;
+            this.okHttpClientBuilder = cachingOkHttpClient.okHttpClient.newBuilder();
+            this.cache = null;
+            this.maxAgeSeconds = cachingOkHttpClient.maxAgeSeconds;
+        }
+
         public Builder cache(Cache cache) {
             this.cache = cache;
             return this;
         }
 
         public Builder cache(String cacheDirectory, int diskSizeInBytes) {
-            this.cache = getCache(context, cacheDirectory, diskSizeInBytes);;
+            this.cache = getCache(context, cacheDirectory, diskSizeInBytes);
             return this;
         }
 
