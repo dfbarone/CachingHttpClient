@@ -92,13 +92,26 @@ public class CachingHttpClient {
         }
     }
 
-    private Call newCall(Request request) {
+    /**
+     * Build a caching OkHttp3 client that will persist by default via disk cache.
+     * <p>
+     * A) This client will use request.cachecontrol.maxAge to set response max-age.
+     *     CacheControl.maxAgeSeconds is required to set maxAge of the response
+     *     if it is not set it will default to 60s
+     * B) This client will default requests to max-stale 365 days when offline.
+     *
+     *
+     * @param request standard okhttp3 request for GET call
+     * @return OkHttpClient
+     */
+    public OkHttpClient buildCachingOkhttpClient(Request request) {
         OkHttpClient.Builder clientBuilder = mHttpClient.newBuilder();
         // When FORCE_CACHE is not set
-        if (!request.cacheControl().onlyIfCached()) {
+        if (request.cacheControl() != null && !request.cacheControl().onlyIfCached()) {
+            int maxAge = request.cacheControl().maxAgeSeconds();
             // Add interceptors
             clientBuilder
-                    .addNetworkInterceptor(new ResponseCacheNetworkInterceptor(request.cacheControl().maxAgeSeconds()))
+                    .addNetworkInterceptor(new ResponseCacheNetworkInterceptor(maxAge > -1 ? maxAge : MAX_AGE))
                     .addInterceptor(new OfflineResponseCacheInterceptor(MAX_STALE));
 
             // When making GET calls...
@@ -113,61 +126,40 @@ public class CachingHttpClient {
                         .connectionPool(new ConnectionPool(0, 1, TimeUnit.NANOSECONDS));
             }
         }
-        return clientBuilder.build().newCall(request);
+        return clientBuilder.build();
     }
 
+    /**
+     * Caching enabled http GET based on max age.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return Response
+     */
     public Response getResponse(Request request) throws IOException {
-        try {
-            Call call = newCall(request);
-            Response response = call.execute();
-            if (response.networkResponse() != null && response.cacheResponse() != null) {
-                Log.d(TAG, "get cond'tnl " + response.code() + " " + request.url());
-            } else if (response.networkResponse() != null) {
-                Log.d(TAG, "get  network " + response.code() + " " + request.url());
-            } else if (response.cacheResponse() != null) {
-                Log.d(TAG, "get   cached " + response.code() + " " + request.url());
-            } else {
-                Log.d(TAG, "get      bad " + response.code() + " " + request.url());
-            }
-            //response.close();
-            return response;
-        } catch (IOException e) {
-            Log.d(TAG, "getResponse error " + e.getMessage());
-            e.printStackTrace();
-            throw e;
-        } catch (IllegalArgumentException e) {
-            Log.d(TAG, "getResponse error " + e.getMessage());
-            e.printStackTrace();
+
+        OkHttpClient okHttpClient = buildCachingOkhttpClient(request);
+        Call call = okHttpClient.newCall(request);
+        Response response = call.execute();
+        if (response.networkResponse() != null && response.cacheResponse() != null) {
+            Log.d(TAG, "get cond'tnl " + response.networkResponse().code() + " " + request.url());
+        } else if (response.networkResponse() != null) {
+            Log.d(TAG, "get  network " + response.networkResponse().code() + " " + request.url());
+        } else if (response.cacheResponse() != null) {
+            Log.d(TAG, "get   cached " + response.cacheResponse().code() + " " + request.url());
+        } else {
+            Log.d(TAG, "get      bad " + response.code() + " " + request.url());
         }
-        return null;
+        return response;
     }
 
-    public boolean isExpired(Request request) {
-        boolean expired = true;
-        try {
-            // Checking if a response is expired requires getting from cache only
-            Response response = getResponse(request.newBuilder()
-                    .cacheControl(new CacheControl.Builder()
-                            .onlyIfCached()
-                            .maxAge(request.cacheControl().maxAgeSeconds(), TimeUnit.SECONDS)
-                            .build())
-                    .build()
-            );
-
-            if (response != null && response.isSuccessful()) {
-                long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
-                expired = false;
-                Log.d(TAG, "isExpired false " + diff + "s elapsed " + request.url());
-            } else {
-                Log.d(TAG, "isExpired true " + request.url());
-            }
-            response.close();
-        } catch (IOException e) {
-            Log.d(TAG, "isExpired error " + e.getMessage());
-        }
-        return expired;
-    }
-
+    /**
+     * Caching enabled http GET based on max age.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return String response body
+     */
     public String getString(Request request) throws IOException {
         String payload = null;
         try {
@@ -180,6 +172,13 @@ public class CachingHttpClient {
         return payload;
     }
 
+    /**
+     * Caching enabled http GET based on max age.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return String response body
+     */
     public Single<String> getStringAsync(final Request request) {
         return Single.fromCallable(new Callable<String>() {
             @Override
@@ -189,6 +188,13 @@ public class CachingHttpClient {
         });
     }
 
+    /**
+     * Caching enabled http GET based on max age.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return Moshi deserialized class of response body
+     */
     public <T> T get(final Request request, final Class<T> clazz) throws IOException {
         Response response = getResponse(request);
         T payloadT = null;
@@ -208,6 +214,13 @@ public class CachingHttpClient {
         return payloadT;
     }
 
+    /**
+     * Caching enabled http GET based on max age.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return Moshi deserialized class of response body
+     */
     public <T> Single<T> getAsync(final Request request, final Class<T> clazz) {
         return Single.fromCallable(new Callable<T>() {
             @Override
@@ -217,6 +230,13 @@ public class CachingHttpClient {
         });
     }
 
+    /**
+     * Force network http GET.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return String of response body
+     */
     public String fetchString(Request request) throws IOException {
         Request newRequest = request.newBuilder()
                 .cacheControl(new CacheControl.Builder()
@@ -228,6 +248,13 @@ public class CachingHttpClient {
         return getString(newRequest);
     }
 
+    /**
+     * Force network http GET.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return String of response body
+     */
     public Single<String> fetchStringAsync(Request request) {
         Request newRequest = request.newBuilder()
                 .cacheControl(new CacheControl.Builder()
@@ -239,6 +266,13 @@ public class CachingHttpClient {
         return getStringAsync(newRequest);
     }
 
+    /**
+     * Force network http GET.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return Moshi deserialized class of response body
+     */
     public <T> T fetch(final Request request, final Class<T> clazz) throws IOException {
         Request newRequest = request.newBuilder()
                 .cacheControl(new CacheControl.Builder()
@@ -250,6 +284,13 @@ public class CachingHttpClient {
         return get(newRequest, clazz);
     }
 
+    /**
+     * Force network http GET.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return Moshi deserialized class of response body
+     */
     public <T> Single<T> fetchAsync(final Request request, final Class<T> clazz) {
         Request newRequest = request.newBuilder()
                 .cacheControl(new CacheControl.Builder()
@@ -259,6 +300,40 @@ public class CachingHttpClient {
                 .build();
 
         return getAsync(newRequest, clazz);
+    }
+
+    /**
+     * A helper method to determine if your http GET is expired.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     * @param request standard okhttp3 request for GET call
+     * @return true of exipired in disk cache
+     */
+    public boolean isExpired(Request request) {
+        try {
+            int maxAge = request.cacheControl().maxAgeSeconds();
+
+            // Checking if a response is expired requires getting from cache only
+            Response response = getResponse(request.newBuilder()
+                    .cacheControl(new CacheControl.Builder()
+                            .onlyIfCached()
+                            .maxAge(maxAge > -1 ? maxAge : MAX_AGE, TimeUnit.SECONDS)
+                            .build())
+                    .build()
+            );
+
+            if (response != null && response.cacheResponse() != null && response.isSuccessful()) {
+                long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
+                Log.d(TAG, "isExpired false " + diff + "s elapsed " + request.url());
+                return false;
+            } else {
+                Log.d(TAG, "isExpired true " + request.url());
+            }
+            response.close();
+        } catch (Exception e) {
+            Log.d(TAG, "isExpired error " + e.getMessage());
+        }
+        return true;
     }
 
 }
