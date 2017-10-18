@@ -120,50 +120,6 @@ public class CachingOkHttpClient {
     }
 
     /**
-     * Caching enabled http GET based on max age.
-     * CacheControl.maxAgeSeconds is required to set maxAge of the response
-     * if it is not set it will default to 60s
-     *
-     * @param request standard okhttp3 request for GET call
-     * @return Moshi deserialized class of response body
-     */
-    public <T extends Object> T get(final Request request, final Class<T> clazz) throws IOException {
-        Response response = getResponse(request);
-        T payloadT = null;
-        try {
-            String payload = new String(response.body().bytes(), "UTF-8");
-            if (payload != null) {
-                payloadT = ConverterUtils.moshiFromJson(payload, clazz);
-                if (payloadT != null) {
-                    return payloadT;
-                } else {
-                    throw new IOException("parse exception");
-                }
-            }
-        } catch (IllegalArgumentException e) {
-            Log.d(TAG, "get error " + e.getMessage());
-        }
-        return payloadT;
-    }
-
-    /**
-     * Caching enabled http GET based on max age.
-     * CacheControl.maxAgeSeconds is required to set maxAge of the response
-     * if it is not set it will default to 60s
-     *
-     * @param request standard okhttp3 request for GET call
-     * @return Moshi deserialized class of response body
-     */
-    public <T extends Object> Single<T> getAsync(final Request request, final Class<T> clazz) {
-        return Single.fromCallable(new Callable<T>() {
-            @Override
-            public T call() throws IOException {
-                return get(request, clazz);
-            }
-        });
-    }
-
-    /**
      * A helper method to determine if your http GET is expired.
      * CacheControl.maxAgeSeconds is required to set maxAge of the response
      * if it is not set it will default to maxAgeSeconds
