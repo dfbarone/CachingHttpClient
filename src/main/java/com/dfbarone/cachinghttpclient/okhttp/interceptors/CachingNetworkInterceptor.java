@@ -31,11 +31,8 @@ public class CachingNetworkInterceptor implements Interceptor {
     public okhttp3.Response intercept(Chain chain) throws IOException {
         int maxAge = maxAgeSeconds;
         Request request = chain.request();
-        if (request.cacheControl() != null && !request.cacheControl().onlyIfCached()) {
-            CacheControl cacheControl = request.cacheControl();
-            if (cacheControl.maxAgeSeconds() > -1) {
-                maxAge = cacheControl.maxAgeSeconds();
-            }
+        if (request.cacheControl() != null && request.cacheControl().maxAgeSeconds() > -1) {
+            maxAge = request.cacheControl().maxAgeSeconds();
         }
         Response originalResponse = chain.proceed(chain.request());
         return originalResponse.newBuilder()
