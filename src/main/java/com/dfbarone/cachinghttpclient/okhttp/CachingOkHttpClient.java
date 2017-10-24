@@ -1,10 +1,12 @@
 package com.dfbarone.cachinghttpclient.okhttp;
 
 import android.content.Context;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.dfbarone.cachinghttpclient.okhttp.interceptors.CachingOfflineInterceptor;
 import com.dfbarone.cachinghttpclient.okhttp.interceptors.CachingNetworkInterceptor;
+import com.dfbarone.cachinghttpclient.simplepersistence.SimplePersistenceInterface;
 import com.dfbarone.cachinghttpclient.okhttp.utils.ConverterUtils;
 
 import java.io.File;
@@ -34,6 +36,7 @@ public class CachingOkHttpClient {
     private int maxAgeSeconds;
     private int maxStaleSeconds;
     private Context context;
+    private SimplePersistenceInterface dataStore;
 
     public CachingOkHttpClient(Context context) {
         this.context = context;
@@ -41,6 +44,7 @@ public class CachingOkHttpClient {
         okHttpClient = builder.okHttpClient;
         maxAgeSeconds = builder.maxAgeSeconds;
         maxStaleSeconds = builder.maxStaleSeconds;
+        dataStore = builder.dataStore;
     }
 
     // For calling inside Builder.build() method
@@ -49,6 +53,7 @@ public class CachingOkHttpClient {
         this.okHttpClient = builder.okHttpClient;
         this.maxAgeSeconds = builder.maxAgeSeconds;
         this.maxStaleSeconds = builder.maxStaleSeconds;
+        this.dataStore = builder.dataStore;
     }
 
     public OkHttpClient okHttpClient() {
@@ -140,6 +145,7 @@ public class CachingOkHttpClient {
         try {
             Response response = getResponse(request);
             payload = ConverterUtils.responseToString(response);
+            store(request, response, payload);
             response.close();
         } catch (IllegalArgumentException e) {
             Log.d(TAG, "getString error " + e.getMessage());
@@ -197,7 +203,31 @@ public class CachingOkHttpClient {
         } catch (Exception e) {
             Log.d(TAG, "isExpired error " + e.getMessage());
         }
-        return true;
+        return false;
+    }
+
+    public synchronized Object load(String url) {
+        if (dataStore != null) {
+            return dataStore.load(new Request.Builder().url(url).build());
+        }
+        return null;
+    }
+
+    private synchronized void store(Request request, Response response, String body) {
+        if (response.networkResponse() != null && response.networkResponse().isSuccessful()) {
+            if (dataStore != null && !TextUtils.isEmpty(body)) {
+                dataStore.store(request, response, body);
+            }
+        }
+    }
+
+    public static void cancel(OkHttpClient client, Object tag) {
+        for (Call call : client.dispatcher().queuedCalls()) {
+            if (tag.equals(call.request().tag())) call.cancel();
+        }
+        for (Call call : client.dispatcher().runningCalls()) {
+            if (tag.equals(call.request().tag())) call.cancel();
+        }
     }
 
     /**
@@ -225,6 +255,7 @@ public class CachingOkHttpClient {
         private OkHttpClient okHttpClient;
         private Context context;
         private Cache cache;
+        private SimplePersistenceInterface dataStore;
         private int maxAgeSeconds;
         private int maxStaleSeconds;
 
@@ -232,6 +263,7 @@ public class CachingOkHttpClient {
             this.context = context.getApplicationContext();
             this.okHttpClient = null;
             this.cache = null;
+            this.dataStore = null;
             this.maxAgeSeconds = MAX_AGE_SECONDS;
             this.maxStaleSeconds = MAX_STALE_SECONDS;
         }
@@ -240,6 +272,7 @@ public class CachingOkHttpClient {
             this.context = cachingOkHttpClient.context;
             this.okHttpClient = cachingOkHttpClient.okHttpClient();
             this.cache = null;
+            this.dataStore = null;
             this.maxAgeSeconds = cachingOkHttpClient.maxAgeSeconds;
             this.maxStaleSeconds = cachingOkHttpClient.maxStaleSeconds;
         }
@@ -256,6 +289,11 @@ public class CachingOkHttpClient {
 
         public Builder cache() {
             this.cache = getCache(context, DEFAULT_CACHE_DIR, DEFAULT_DISK_SIZE_BYTES);
+            return this;
+        }
+
+        public Builder sharedPreferences(SimplePersistenceInterface dataStore) {
+            this.dataStore = dataStore;
             return this;
         }
 

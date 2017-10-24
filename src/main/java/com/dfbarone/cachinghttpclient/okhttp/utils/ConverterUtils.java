@@ -35,7 +35,7 @@ public class ConverterUtils {
         return payload;
     }
 
-    public static <T> T moshiFromJson(final String jsonString, Class<T> clazz) {
+    public static <T> T jsonToMoshi(final String jsonString, Class<T> clazz) {
         T var = null;
         try {
             Moshi moshi = new Moshi.Builder().build();
@@ -47,7 +47,7 @@ public class ConverterUtils {
         return var;
     }
 
-    public static <T> T gsonFromJson(final String jsonString, Class<T> clazz) {
+    public static <T> T jsonToGson(final String jsonString, Class<T> clazz) {
         T var = null;
         try {
             Gson gson = new Gson();
