@@ -5,7 +5,9 @@ import android.content.Context;
 import com.dfbarone.cachinghttpclient.okhttp.utils.NetworkUtils;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
+import okhttp3.CacheControl;
 import okhttp3.Interceptor;
 import okhttp3.Request;
 
@@ -35,7 +37,11 @@ public class CachingOfflineInterceptor implements Interceptor {
         Request request = chain.request();
         if (!NetworkUtils.isNetworkAvailable(mContext)) {
             request = chain.request().newBuilder()
-                    .header("Cache-Control", "public, only-if-cached, max-stale=" + MAX_STALE_SECONDS)
+                    //.header("Cache-Control", "public, only-if-cached, max-stale=" + MAX_STALE_SECONDS)
+                    .cacheControl(new CacheControl.Builder()
+                            .maxStale(MAX_STALE_SECONDS, TimeUnit.SECONDS)
+                            .onlyIfCached()
+                            .build())
                     .build();
         }
         return chain.proceed(request);

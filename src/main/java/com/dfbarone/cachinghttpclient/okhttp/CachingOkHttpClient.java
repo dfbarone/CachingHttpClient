@@ -9,6 +9,7 @@ import com.dfbarone.cachinghttpclient.okhttp.utils.ConverterUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -17,6 +18,7 @@ import okhttp3.Cache;
 import okhttp3.CacheControl;
 import okhttp3.Call;
 import okhttp3.ConnectionPool;
+import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -30,19 +32,23 @@ public class CachingOkHttpClient {
     private OkHttpClient okHttpClient;
     private static final String TAG = CachingOkHttpClient.class.getSimpleName();
     private int maxAgeSeconds;
+    private int maxStaleSeconds;
     private Context context;
 
     public CachingOkHttpClient(Context context) {
         this.context = context;
         Builder builder = new Builder(context);
-        okHttpClient = builder.okHttpClientBuilder.build();
+        okHttpClient = builder.okHttpClient;
         maxAgeSeconds = builder.maxAgeSeconds;
+        maxStaleSeconds = builder.maxStaleSeconds;
     }
 
+    // For calling inside Builder.build() method
     private CachingOkHttpClient(Builder builder) {
         this.context = builder.context;
-        okHttpClient = builder.okHttpClientBuilder.build();
-        maxAgeSeconds = builder.maxAgeSeconds;
+        this.okHttpClient = builder.okHttpClient;
+        this.maxAgeSeconds = builder.maxAgeSeconds;
+        this.maxStaleSeconds = builder.maxStaleSeconds;
     }
 
     public OkHttpClient okHttpClient() {
@@ -68,6 +74,25 @@ public class CachingOkHttpClient {
         } catch (Exception e) {
 
         }
+    }
+
+    /**
+     * Custom Per request max age control of cached responses
+     *
+     * @param request
+     * @param maxAgeSeconds
+     * @return
+     */
+    public Call newCall(Request request, int maxAgeSeconds) {
+        OkHttpClient.Builder okHttpClientBuilder = okHttpClient.newBuilder();
+
+        removeInterceptor(okHttpClientBuilder.networkInterceptors(),
+                CachingNetworkInterceptor.class);
+
+        okHttpClientBuilder.addNetworkInterceptor(new CachingNetworkInterceptor(maxAgeSeconds));
+
+        return okHttpClientBuilder.build()
+                .newCall(request);
     }
 
     /**
@@ -175,29 +200,48 @@ public class CachingOkHttpClient {
         return true;
     }
 
+    /**
+     * Remove all instances of a specific type of interceptor.
+     *
+     * @param intereceptors a list of interceptors
+     * @param clazz the class type of new interceptor
+     * @param <T>
+     */
+    public static <T> void removeInterceptor(List<Interceptor> intereceptors, Class<T> clazz) {
+        for (Interceptor i : intereceptors) {
+            if (clazz.isInstance(i)) {
+                intereceptors.remove(i);
+            }
+        }
+    }
+
     public static final class Builder {
 
         public static final int MAX_AGE_SECONDS = 60;
+        public static final int MAX_STALE_SECONDS = 60 * 60 * 24 * 356;
         private static final int DEFAULT_DISK_SIZE_BYTES = 10 * 1024 * 1024;
         private static final String DEFAULT_CACHE_DIR = "caching_ok_http_client";
 
-        private OkHttpClient.Builder okHttpClientBuilder;
+        private OkHttpClient okHttpClient;
         private Context context;
         private Cache cache;
         private int maxAgeSeconds;
+        private int maxStaleSeconds;
 
         public Builder(Context context) {
             this.context = context.getApplicationContext();
-            this.okHttpClientBuilder = null;
+            this.okHttpClient = new OkHttpClient();
             this.cache = null;
             this.maxAgeSeconds = MAX_AGE_SECONDS;
+            this.maxStaleSeconds = MAX_STALE_SECONDS;
         }
 
         public Builder(CachingOkHttpClient cachingOkHttpClient) {
             this.context = cachingOkHttpClient.context;
-            this.okHttpClientBuilder = cachingOkHttpClient.okHttpClient.newBuilder();
+            this.okHttpClient = cachingOkHttpClient.okHttpClient();
             this.cache = null;
             this.maxAgeSeconds = cachingOkHttpClient.maxAgeSeconds;
+            this.maxStaleSeconds = cachingOkHttpClient.maxStaleSeconds;
         }
 
         public Builder cache(Cache cache) {
@@ -220,22 +264,27 @@ public class CachingOkHttpClient {
             return this;
         }
 
-        public Builder okHttpClient(OkHttpClient okHttpClient) {
-            this.okHttpClientBuilder = okHttpClient.newBuilder();
+        public Builder maxStale(int maxStaleSeconds) {
+            this.maxStaleSeconds = maxStaleSeconds;
             return this;
         }
 
-        public Builder okHttpClient(OkHttpClient.Builder okHttpClientBuilder) {
-            this.okHttpClientBuilder = okHttpClientBuilder;
+        public Builder okHttpClient(OkHttpClient okHttpClient) throws IllegalArgumentException {
+            if (okHttpClient == null) {
+                throw new IllegalArgumentException("OkHttpClient cannot be null");
+            }
+            this.okHttpClient = okHttpClient;
             return this;
         }
 
         public CachingOkHttpClient build() {
 
             // If no default ok http client, make one.
-            if (okHttpClientBuilder == null) {
-                okHttpClientBuilder = new OkHttpClient.Builder();
+            if (okHttpClient == null) {
+                throw new IllegalArgumentException("OkHttpClient cannot be null");
             }
+
+            OkHttpClient.Builder okHttpClientBuilder = okHttpClient.newBuilder();
 
             // If cache has been set, override.
             if (cache != null) {
@@ -245,6 +294,8 @@ public class CachingOkHttpClient {
             // Add interceptors to enforce
             // A) max-age when GET responses are cached
             // B) max-stale when GET requests are made offline
+            removeInterceptor(okHttpClientBuilder.interceptors(), CachingOfflineInterceptor.class);
+            removeInterceptor(okHttpClientBuilder.networkInterceptors(), CachingNetworkInterceptor.class);
             okHttpClientBuilder
                     .addNetworkInterceptor(new CachingNetworkInterceptor(maxAgeSeconds))
                     .addInterceptor(new CachingOfflineInterceptor(context));
@@ -257,6 +308,8 @@ public class CachingOkHttpClient {
             // get killed. The workaround is to set the connection pool below.
             // https://github.com/square/okhttp/issues/3146
             okHttpClientBuilder.connectionPool(new ConnectionPool(0, 1, TimeUnit.NANOSECONDS));
+
+            okHttpClient = okHttpClientBuilder.build();
 
             return new CachingOkHttpClient(this);
         }
