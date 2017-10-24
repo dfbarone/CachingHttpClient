@@ -7,6 +7,7 @@ import java.util.concurrent.TimeUnit;
 
 import okhttp3.CacheControl;
 import okhttp3.Interceptor;
+import okhttp3.Request;
 import okhttp3.Response;
 
 /**
@@ -32,15 +33,19 @@ public class CachingNetworkInterceptor implements Interceptor {
      */
     @Override
     public okhttp3.Response intercept(Chain chain) throws IOException {
-        Response originalResponse = chain.proceed(chain.request());
-
-        // Override cache control header. Using CacheControl builder hoping it may be more
-        // forward compatible than hard coding '"max-age=" + maxAgeSeconds'
-        return originalResponse.newBuilder()
-                .header("Cache-Control", new CacheControl.Builder()
-                        .maxAge(maxAgeSeconds, TimeUnit.SECONDS)
-                        .build()
-                        .toString())
-                .build();
+        Request request = chain.request();
+        Response originalResponse = chain.proceed(request);
+        // Only modify response if this is a GET request
+        if (request.method().equalsIgnoreCase("get")) {
+            // Override cache control header. Using CacheControl builder hoping it may be more
+            // forward compatible than hard coding '"max-age=" + maxAgeSeconds'
+            return originalResponse.newBuilder()
+                    .header("Cache-Control", new CacheControl.Builder()
+                            .maxAge(maxAgeSeconds, TimeUnit.SECONDS)
+                            .build()
+                            .toString())
+                    .build();
+        }
+        return originalResponse;
     }
 }

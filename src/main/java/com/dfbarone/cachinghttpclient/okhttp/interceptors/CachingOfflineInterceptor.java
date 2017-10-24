@@ -36,13 +36,15 @@ public class CachingOfflineInterceptor implements Interceptor {
     public okhttp3.Response intercept(Chain chain) throws IOException {
         Request request = chain.request();
         if (!NetworkUtils.isNetworkAvailable(mContext)) {
-            request = chain.request().newBuilder()
-                    //.header("Cache-Control", "public, only-if-cached, max-stale=" + MAX_STALE_SECONDS)
-                    .cacheControl(new CacheControl.Builder()
-                            .maxStale(MAX_STALE_SECONDS, TimeUnit.SECONDS)
-                            .onlyIfCached()
-                            .build())
-                    .build();
+            if (request.method().equalsIgnoreCase("get")) {
+                request = chain.request().newBuilder()
+                        //.header("Cache-Control", "public, only-if-cached, max-stale=" + MAX_STALE_SECONDS)
+                        .cacheControl(new CacheControl.Builder()
+                                .maxStale(MAX_STALE_SECONDS, TimeUnit.SECONDS)
+                                .onlyIfCached()
+                                .build())
+                        .build();
+            }
         }
         return chain.proceed(request);
     }
