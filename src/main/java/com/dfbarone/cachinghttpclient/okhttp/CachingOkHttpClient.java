@@ -230,7 +230,7 @@ public class CachingOkHttpClient {
 
         public Builder(Context context) {
             this.context = context.getApplicationContext();
-            this.okHttpClient = new OkHttpClient();
+            this.okHttpClient = null;
             this.cache = null;
             this.maxAgeSeconds = MAX_AGE_SECONDS;
             this.maxStaleSeconds = MAX_STALE_SECONDS;
