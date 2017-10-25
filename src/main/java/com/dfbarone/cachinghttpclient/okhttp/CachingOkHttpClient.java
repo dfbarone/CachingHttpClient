@@ -1,11 +1,11 @@
 package com.dfbarone.cachinghttpclient.okhttp;
 
 import android.content.Context;
-import android.text.TextUtils;
 import android.util.Log;
 
 import com.dfbarone.cachinghttpclient.okhttp.interceptors.CachingOfflineInterceptor;
 import com.dfbarone.cachinghttpclient.okhttp.interceptors.CachingNetworkInterceptor;
+import com.dfbarone.cachinghttpclient.simplepersistence.json.ResponsePojo;
 import com.dfbarone.cachinghttpclient.simplepersistence.SimplePersistenceInterface;
 import com.dfbarone.cachinghttpclient.okhttp.utils.ConverterUtils;
 
@@ -62,6 +62,10 @@ public class CachingOkHttpClient {
 
     public CachingOkHttpClient.Builder newBuilder() {
         return new Builder(this);
+    }
+
+    public SimplePersistenceInterface dataStore() {
+        return dataStore;
     }
 
     private void logResponse(Request request, Response response, String prefix) {
@@ -145,7 +149,7 @@ public class CachingOkHttpClient {
         try {
             Response response = getResponse(request);
             payload = ConverterUtils.responseToString(response);
-            store(request, response, payload);
+            if (dataStore != null) dataStore.store(response, payload);
             response.close();
         } catch (IllegalArgumentException e) {
             Log.d(TAG, "getString error " + e.getMessage());
@@ -192,36 +196,49 @@ public class CachingOkHttpClient {
 
             Call call = okHttpClient.newCall(newRequest);
             Response response = call.execute();
-            logResponse(newRequest, response, "isExpired");
+            //logResponse(newRequest, response, "isExpired");
 
             if (response != null && response.cacheResponse() != null && response.isSuccessful()) {
                 long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
                 response.close();
+                Log.d(TAG, "isExpired " + (diff > maxAge) + " " + diff + "s");
                 return diff > maxAge;
             }
             response.close();
+
+            Object responseObj = dataStore.load(request);
+            if (responseObj instanceof ResponsePojo) {
+                ResponsePojo pojo = (ResponsePojo) responseObj;
+                if (pojo.timestamp != null) {
+                    long diff = (System.currentTimeMillis() - Long.valueOf(pojo.timestamp)) / 1000;
+                    response.close();
+                    Log.d(TAG, "isExpired " + (diff > maxAge) + " " + diff + "s");
+                    return diff > maxAge;
+                }
+            }
         } catch (Exception e) {
             Log.d(TAG, "isExpired error " + e.getMessage());
         }
+        Log.d(TAG, "isExpired " + true);
         return false;
     }
 
-    public synchronized Object load(String url) {
+    /*public synchronized Object load(String url) {
         if (dataStore != null) {
             return dataStore.load(new Request.Builder().url(url).build());
         }
         return null;
-    }
+    }*/
 
-    private synchronized void store(Request request, Response response, String body) {
+    /*public synchronized void store(Request request, Response response, String body) {
         if (response.networkResponse() != null && response.networkResponse().isSuccessful()) {
             if (dataStore != null && !TextUtils.isEmpty(body)) {
                 dataStore.store(request, response, body);
             }
         }
-    }
+    }*/
 
-    public static void cancel(OkHttpClient client, Object tag) {
+    private static void cancel(OkHttpClient client, Object tag) {
         for (Call call : client.dispatcher().queuedCalls()) {
             if (tag.equals(call.request().tag())) call.cancel();
         }

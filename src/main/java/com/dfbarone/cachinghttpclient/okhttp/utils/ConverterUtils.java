@@ -25,7 +25,6 @@ public class ConverterUtils {
         try {
             if (response != null) {
                 payload = new String(response.body().bytes(), "UTF-8");
-                response.close();
             }
         } catch (UnsupportedEncodingException e) {
 

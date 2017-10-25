@@ -3,6 +3,9 @@ package com.dfbarone.cachinghttpclient.simplepersistence;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import com.dfbarone.cachinghttpclient.simplepersistence.json.ResponsePojo;
+import com.google.gson.Gson;
+
 import okhttp3.Request;
 import okhttp3.Response;
 
@@ -20,40 +23,50 @@ public class SharedPreferencesDataStore implements SimplePersistenceInterface {
         this.sharedPreferences = sharedPreferences;
     }
 
-    public synchronized void store(Request request, Response response, String body) {
+    public synchronized void store(Response response, String responseBody) {
         try {
-            if (sharedPreferences != null) {
-                String url = request.url().toString();
-                SharedPreferences.Editor editor = sharedPreferences.edit();
-                editor.putString(url, body);
-                editor.commit();
-                Log.d(TAG, "store " + url);
-                Log.d(TAG, "store " + body);
+            if (response.networkResponse() != null && response.networkResponse().isSuccessful()) {
+                if (sharedPreferences != null) {
 
-               // load(url);
+                    SharedPreferences.Editor editor = sharedPreferences.edit();
+
+                    ResponsePojo pojo = new ResponsePojo();
+                    pojo.setId(response.request().url().toString());
+                    pojo.setUrl(pojo.getId());
+                    pojo.setBody(responseBody);
+                    pojo.setTimestamp(String.valueOf(response.receivedResponseAtMillis()));
+
+                    Gson gson = new Gson();
+                    String json = gson.toJson(pojo, ResponsePojo.class).toString();
+
+                    editor.putString(pojo.getId(), json);
+                    editor.apply();
+
+                    Log.d(TAG, "store " + pojo.getUrl());
+                    Log.d(TAG, "store " + responseBody);
+                }
             }
         } catch (Exception e) {
             Log.d(TAG, "store error");
         }
     }
 
-    public synchronized String load(Request request) {
+    public synchronized ResponsePojo load(Request request) {
         try {
             if (sharedPreferences != null) {
                 final String body = sharedPreferences.getString(request.url().toString(), "");
-                Log.d(TAG, "load " + " " + request.url().toString());
+
+                Gson gson = new Gson();
+                ResponsePojo pojo = gson.fromJson(body, ResponsePojo.class);
+
+                Log.d(TAG, "load " + " " + pojo.getUrl());
                 Log.d(TAG, "load " + " " + body);
-                return body;
+                return pojo;
             }
         } catch (Exception e) {
             Log.d(TAG, "load error");
         }
-        return "";
+        return null;
     }
 
-    public synchronized void clear() {
-        if (sharedPreferences != null) {
-            sharedPreferences.edit().clear().commit();
-        }
-    }
 }

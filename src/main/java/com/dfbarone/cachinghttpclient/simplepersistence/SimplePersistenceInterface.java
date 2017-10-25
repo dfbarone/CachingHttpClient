@@ -1,5 +1,7 @@
 package com.dfbarone.cachinghttpclient.simplepersistence;
 
+import java.util.Objects;
+
 import okhttp3.Request;
 import okhttp3.Response;
 
@@ -10,16 +12,15 @@ import okhttp3.Response;
 public interface SimplePersistenceInterface {
     /**
      * Store a response anywhere you like
-     * @param request
      * @param response
-     * @param body
+     * @param responseBody
      */
-    void store(Request request, Response response, String body);
+    void store(Response response, String responseBody);
 
     /**
      * Load a response in any form you like
      * @param request
      * @return
      */
-    String load(Request request);
+    Object load(Request request);
 }
