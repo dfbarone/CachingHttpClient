@@ -128,12 +128,7 @@ public class CachingOkHttpClient {
      * @return Response
      */
     public Single<Response> getResponseAsync(final Request request) throws IOException {
-        return Single.fromCallable(new Callable<Response>() {
-            @Override
-            public Response call() throws IOException {
-                return getResponse(request);
-            }
-        });
+        return Single.fromCallable(() -> getResponse(request));
     }
 
     /**
@@ -166,12 +161,7 @@ public class CachingOkHttpClient {
      * @return String response body
      */
     public Single<String> getStringAsync(final Request request) {
-        return Single.fromCallable(new Callable<String>() {
-            @Override
-            public String call() throws IOException {
-                return getString(request);
-            }
-        });
+        return Single.fromCallable(() -> getString(request));
     }
 
     /**
