@@ -21,9 +21,11 @@ public class CachingOfflineInterceptor implements Interceptor {
 
     private static final int MAX_STALE_SECONDS = 60 * 60 * 24 * 365;
     private Context mContext;
+    private boolean mHasCache;
 
-    public CachingOfflineInterceptor(Context context) {
+    public CachingOfflineInterceptor(Context context, boolean hasCache) {
         mContext = context;
+        mHasCache = hasCache;
     }
 
     /**
@@ -35,7 +37,7 @@ public class CachingOfflineInterceptor implements Interceptor {
     @Override
     public okhttp3.Response intercept(Chain chain) throws IOException {
         Request request = chain.request();
-        if (!NetworkUtils.isNetworkAvailable(mContext)) {
+        if (!NetworkUtils.isNetworkAvailable(mContext) && mHasCache) {
             if (request.method().equalsIgnoreCase("get")) {
                 request = chain.request().newBuilder()
                         //.header("Cache-Control", "public, only-if-cached, max-stale=" + MAX_STALE_SECONDS)

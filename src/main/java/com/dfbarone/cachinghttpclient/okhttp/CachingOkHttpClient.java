@@ -3,18 +3,17 @@ package com.dfbarone.cachinghttpclient.okhttp;
 import android.content.Context;
 import android.util.Log;
 
-import com.dfbarone.cachinghttpclient.okhttp.interceptors.CachingOfflineInterceptor;
 import com.dfbarone.cachinghttpclient.okhttp.interceptors.CachingNetworkInterceptor;
-import com.dfbarone.cachinghttpclient.simplepersistence.json.ResponsePojo;
-import com.dfbarone.cachinghttpclient.simplepersistence.SimplePersistenceInterface;
+import com.dfbarone.cachinghttpclient.okhttp.interceptors.CachingOfflineInterceptor;
 import com.dfbarone.cachinghttpclient.okhttp.utils.ConverterUtils;
+import com.dfbarone.cachinghttpclient.simplepersistence.SimplePersistenceInterface;
+import com.dfbarone.cachinghttpclient.simplepersistence.json.ResponsePojo;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
+import io.reactivex.Observable;
 import io.reactivex.Single;
 import okhttp3.Cache;
 import okhttp3.CacheControl;
@@ -112,12 +111,22 @@ public class CachingOkHttpClient {
      * @param request standard okhttp3 request for GET call
      * @return Response
      */
-    public Response getResponse(Request request) throws IOException {
+    /*public Response getResponse(Request request) throws IOException {
         Call call = okHttpClient.newCall(request);
-        Response response = call.execute();
-        logResponse(request, response, "get");
+        Response response = null;
+        try {
+            response = call.execute();
+            logResponse(request, response, "get");
+            if (dataStore != null) {
+                String payload = ConverterUtils.responseToString(response);
+                dataStore.store(response, payload);
+            }
+        } catch (IOException e) {
+            Log.d(TAG, "getString error " + e.getMessage());
+            throw e;
+        }
         return response;
-    }
+    }*/
 
     /**
      * Caching enabled http GET based on max age.
@@ -127,8 +136,24 @@ public class CachingOkHttpClient {
      * @param request standard okhttp3 request for GET call
      * @return Response
      */
-    public Single<Response> getResponseAsync(final Request request) throws IOException {
-        return Single.fromCallable(() -> getResponse(request));
+    public Observable<Response> getResponseAsync(final Request request) {
+        return Observable.fromCallable(() -> {
+            Call call = okHttpClient.newCall(request);
+            Response response = call.execute();
+            logResponse(request, response, "get");
+            return response;
+        })
+                .doOnNext(response -> {
+                    if (dataStore != null) {
+                        String payload = ConverterUtils.responseToString(response.peekBody(Long.MAX_VALUE).bytes());
+                        if (payload != null) {
+                            dataStore.store(response, payload);
+                        }
+                    }
+                })
+                .doOnError(error -> {
+                    Log.d(TAG, "getString error " + error.getMessage());
+                });
     }
 
     /**
@@ -139,7 +164,7 @@ public class CachingOkHttpClient {
      * @param request standard okhttp3 request for GET call
      * @return String response body
      */
-    public String getString(Request request) throws IOException {
+    /*public String getString(Request request) throws IOException {
         String payload = null;
         try {
             Response response = getResponse(request);
@@ -147,10 +172,10 @@ public class CachingOkHttpClient {
             if (dataStore != null) dataStore.store(response, payload);
             response.close();
         } catch (IllegalArgumentException e) {
-            Log.d(TAG, "getString error " + e.getMessage());
+            throw e;
         }
         return payload;
-    }
+    }*/
 
     /**
      * Caching enabled http GET based on max age.
@@ -161,7 +186,19 @@ public class CachingOkHttpClient {
      * @return String response body
      */
     public Single<String> getStringAsync(final Request request) {
-        return Single.fromCallable(() -> getString(request));
+        return Single.fromObservable(getResponseAsync(request)
+                .map(response -> {
+                    String payload = null;
+                    try {
+                        payload = ConverterUtils.responseToString(response.body().bytes());
+                        response.close();
+                    } catch (IllegalArgumentException e) {
+                        Log.d(TAG, "getString error " + e.getMessage());
+                    } catch (Exception e) {
+                        Log.d(TAG, "getString error " + e.getMessage());
+                    }
+                    return payload;
+                }));
     }
 
     /**
@@ -284,8 +321,8 @@ public class CachingOkHttpClient {
             this.maxStaleSeconds = cachingOkHttpClient.maxStaleSeconds;
         }
 
-        public Builder cache(Cache cache) {
-            this.cache = cache;
+        public Builder cache(Cache httpCache) {
+            this.cache = httpCache;
             return this;
         }
 
@@ -299,7 +336,7 @@ public class CachingOkHttpClient {
             return this;
         }
 
-        public Builder sharedPreferences(SimplePersistenceInterface dataStore) {
+        public Builder dataStore(SimplePersistenceInterface dataStore) {
             this.dataStore = dataStore;
             return this;
         }
@@ -343,7 +380,7 @@ public class CachingOkHttpClient {
             removeInterceptor(okHttpClientBuilder.networkInterceptors(), CachingNetworkInterceptor.class);
             okHttpClientBuilder
                     .addNetworkInterceptor(new CachingNetworkInterceptor(maxAgeSeconds))
-                    .addInterceptor(new CachingOfflineInterceptor(context));
+                    .addInterceptor(new CachingOfflineInterceptor(context, okHttpClient.cache() != null));
 
             // Retry can't hurt? right?
             okHttpClientBuilder.retryOnConnectionFailure(true);

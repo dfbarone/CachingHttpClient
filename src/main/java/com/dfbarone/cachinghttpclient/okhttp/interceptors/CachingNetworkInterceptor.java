@@ -2,6 +2,8 @@ package com.dfbarone.cachinghttpclient.okhttp.interceptors;
 
 import android.util.Log;
 
+import com.dfbarone.cachinghttpclient.okhttp.utils.NetworkUtils;
+
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +39,10 @@ public class CachingNetworkInterceptor implements Interceptor {
         Response originalResponse = chain.proceed(request);
         // Only modify response if this is a GET request
         if (request.method().equalsIgnoreCase("get")) {
+
+            // Print possible bad headers
+            NetworkUtils.logInterfereingHeaders(TAG, originalResponse);
+
             // Override cache control header. Using CacheControl builder hoping it may be more
             // forward compatible than hard coding '"max-age=" + maxAgeSeconds'
             return originalResponse.newBuilder()
@@ -44,6 +50,8 @@ public class CachingNetworkInterceptor implements Interceptor {
                             .maxAge(maxAgeSeconds, TimeUnit.SECONDS)
                             .build()
                             .toString())
+                    .removeHeader("Age") // Observed to cause unneeded Conditional GET calls
+                    .removeHeader("Pragma")
                     .build();
         }
         return originalResponse;

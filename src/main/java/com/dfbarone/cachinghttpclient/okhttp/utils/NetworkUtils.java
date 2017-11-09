@@ -5,6 +5,8 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.util.Log;
 
+import okhttp3.Response;
+
 /**
  * Created by hal on 10/1/2017.
  */
@@ -25,6 +27,28 @@ public class NetworkUtils {
             Log.d(NetworkUtils.class.getSimpleName(), e.getMessage());
         }
         return false;
+    }
+
+    public static void logInterfereingHeaders(String TAG, Response originalResponse) {
+        if (originalResponse.headers().get("Date") != null) {
+            Log.d(TAG, "Header " + "Date" + " " + originalResponse.headers().get("Date"));
+        }
+
+        if (originalResponse.headers().get("Expires") != null) {
+            Log.d(TAG, "Header " + "Expires" + " " + originalResponse.headers().get("Expires"));
+        }
+
+        if (originalResponse.headers().get("Last-Modified") != null) {
+            Log.d(TAG, "Header " + "Last-Modified" + " " + originalResponse.headers().get("Last-Modified"));
+        }
+
+        if (originalResponse.headers().get("ETag") != null) {
+            Log.d(TAG, "ETag " + "Last-Modified" + " " + originalResponse.headers().get("ETag"));
+        }
+
+        if (originalResponse.headers().get("Age") != null) {
+            Log.d(TAG, "Age " + "Age" + " " + originalResponse.headers().get("Age"));
+        }
     }
 
 }

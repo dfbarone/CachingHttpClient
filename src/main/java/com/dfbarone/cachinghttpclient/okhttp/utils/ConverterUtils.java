@@ -10,8 +10,6 @@ import com.squareup.moshi.Moshi;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
-import okhttp3.Response;
-
 /**
  * Created by hal on 10/17/2017.
  */
@@ -20,15 +18,15 @@ public class ConverterUtils {
 
     public static final String TAG = ConverterUtils.class.getSimpleName();
 
-    public static String responseToString(Response response) {
+    public static String responseToString(byte[] bytes) {
         String payload = null;
         try {
-            if (response != null) {
-                payload = new String(response.body().bytes(), "UTF-8");
+            if (bytes != null) {
+                payload = new String(bytes, "UTF-8");
             }
         } catch (UnsupportedEncodingException e) {
 
-        } catch (IOException e) {
+        } catch (Exception e) {
 
         }
         return payload;
