@@ -1,7 +1,7 @@
-# CachingHttpClient
-A lazy way to persist data by using the okhttp disk cache for responses.
+# CachingOkHttpClient
+A simple way to persist GET responses by using the okhttp disk cache.
 
 Main purpose to use this is to 
-1) limit caching of non-critical http GET calls to a db.
-2) limit server over-spamming through default 1 minute max-age when online, and long max-stale when offline.
-3) semi-reliable offline persistence thought okhttp disk cache.
+1) Enfore the use of max-age for static http GET calls to limit network use.
+2) Semi-reliable persistence of http responses through use of http disk cache.
+3) Optional confiuration to save http responses to a db.
