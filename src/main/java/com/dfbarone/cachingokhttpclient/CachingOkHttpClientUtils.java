@@ -7,17 +7,14 @@ import android.util.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
-import com.squareup.moshi.JsonAdapter;
-import com.squareup.moshi.Moshi;
 
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
 import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * Created by hal on 10/1/2017.
+ * Created by dominicbarone on 10/1/2017.
  */
 
 public class CachingOkHttpClientUtils {
@@ -79,23 +76,22 @@ public class CachingOkHttpClientUtils {
         return payload;
     }
 
-    public static <T> T jsonToMoshi(final String jsonString, Class<T> clazz) {
-        T var = null;
-        try {
-            Moshi moshi = new Moshi.Builder().build();
-            JsonAdapter<T> jsonAdapter = moshi.adapter(clazz);
-            var = jsonAdapter.fromJson(jsonString);
-        } catch (IOException e) {
-            Log.d(TAG, e.getMessage());
-        }
-        return var;
-    }
-
     public static <T> T jsonToGson(final String jsonString, Class<T> clazz) {
         T var = null;
         try {
             Gson gson = new Gson();
             var = gson.fromJson(jsonString, clazz);
+        } catch (JsonSyntaxException e) {
+            Log.d(TAG, e.getMessage());
+        }
+        return var;
+    }
+
+    public static <T> String gsonToJson(final T data, Class<T> clazz) {
+        String var = null;
+        try {
+            Gson gson = new Gson();
+            var = gson.toJson(data, clazz);
         } catch (JsonSyntaxException e) {
             Log.d(TAG, e.getMessage());
         }

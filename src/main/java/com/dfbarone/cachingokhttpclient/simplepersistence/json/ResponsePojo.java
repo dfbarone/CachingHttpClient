@@ -1,7 +1,7 @@
 package com.dfbarone.cachingokhttpclient.simplepersistence.json;
 
 /**
- * Created by hal on 10/24/2017.
+ * Created by dominicbarone on 10/24/2017.
  */
 
 public class ResponsePojo {

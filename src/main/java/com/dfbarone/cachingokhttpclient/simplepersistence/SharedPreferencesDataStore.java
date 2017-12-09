@@ -10,7 +10,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * Created by hal on 10/24/2017.
+ * Created by dominicbarone on 10/24/2017.
  */
 
 public class SharedPreferencesDataStore implements SimplePersistenceInterface {
@@ -47,7 +47,7 @@ public class SharedPreferencesDataStore implements SimplePersistenceInterface {
                 }
             }
         } catch (Exception e) {
-            Log.d(TAG, "store error");
+            Log.d(TAG, e.getMessage());
         }
     }
 
