@@ -5,7 +5,6 @@ import android.util.Log;
 
 import com.dfbarone.cachingokhttp.CachingInterface;
 import com.dfbarone.cachingokhttp.ResponseEntry;
-import com.google.gson.Gson;
 
 import okhttp3.Request;
 import okhttp3.Response;
@@ -36,11 +35,11 @@ public class SharedPreferencesDataStore implements CachingInterface {
                     pojo.setBody(responseBody);
                     pojo.setReceivedResponseAtMillis(response.receivedResponseAtMillis());
 
-                    Gson gson = new Gson();
+                    /*Gson gson = new Gson();
                     String json = gson.toJson(pojo, ResponseEntry.class).toString();
 
                     editor.putString(pojo.getUrl(), json);
-                    editor.apply();
+                    editor.apply();*/
 
                     Log.d(TAG, "store " + pojo.getUrl());
                     Log.d(TAG, "store " + responseBody);
@@ -56,12 +55,12 @@ public class SharedPreferencesDataStore implements CachingInterface {
             if (sharedPreferences != null) {
                 final String body = sharedPreferences.getString(request.url().toString(), "");
 
-                Gson gson = new Gson();
+                /*Gson gson = new Gson();
                 ResponseEntry pojo = gson.fromJson(body, ResponseEntry.class);
 
                 Log.d(TAG, "load " + " " + pojo.getUrl());
                 Log.d(TAG, "load " + " " + body);
-                return pojo;
+                return pojo;*/
             }
         } catch (Exception e) {
             Log.d(TAG, "load error");
