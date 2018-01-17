@@ -1,23 +1,15 @@
 package com.dfbarone.cachingokhttp;
 
 /**
- * Created by dominicbarone on 10/24/2017.
+ * Created by dfbarone on 10/24/2017.
  */
 
-public class ResponseEntry {
+public class ResponseEntry implements ResponseEntryInterface {
 
-    public String id;
     public String url;
     public String body;
-    public String timestamp;
-
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
+    public long receivedResponseAtMillis;
+    public String tag;
 
     public String getUrl() {
         return url;
@@ -35,11 +27,19 @@ public class ResponseEntry {
         this.body = body;
     }
 
-    public String getTimestamp() {
-        return timestamp;
+    public long getReceivedResponseAtMillis() {
+        return receivedResponseAtMillis;
     }
 
-    public void setTimestamp(String timestamp) {
-        this.timestamp = timestamp;
+    public void setReceivedResponseAtMillis(long timestamp) {
+        this.receivedResponseAtMillis = timestamp;
+    }
+
+    public String getTag() {
+        return tag;
+    }
+
+    public void setTag(String tag) {
+        this.tag = tag;
     }
 }
