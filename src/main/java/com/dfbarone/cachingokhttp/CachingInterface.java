@@ -20,5 +20,5 @@ public interface CachingInterface {
      * @param request
      * @return
      */
-    ResponseEntry load(Request request);
+    ResponseEntryInterface load(Request request);
 }
