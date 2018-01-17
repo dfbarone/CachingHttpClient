@@ -32,15 +32,14 @@ public class SharedPreferencesDataStore implements CachingInterface {
                     SharedPreferences.Editor editor = sharedPreferences.edit();
 
                     ResponseEntry pojo = new ResponseEntry();
-                    pojo.setId(response.request().url().toString());
-                    pojo.setUrl(pojo.getId());
+                    pojo.setUrl(response.request().url().toString());
                     pojo.setBody(responseBody);
-                    pojo.setTimestamp(String.valueOf(response.receivedResponseAtMillis()));
+                    pojo.setReceivedResponseAtMillis(response.receivedResponseAtMillis());
 
                     Gson gson = new Gson();
                     String json = gson.toJson(pojo, ResponseEntry.class).toString();
 
-                    editor.putString(pojo.getId(), json);
+                    editor.putString(pojo.getUrl(), json);
                     editor.apply();
 
                     Log.d(TAG, "store " + pojo.getUrl());
