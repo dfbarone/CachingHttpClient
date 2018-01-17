@@ -1,5 +1,5 @@
 # CachingOkHttp
-A simple way to persist HTTP GET responses by using the okhttp disk cache.
+A wrapper around okhttp to help persist HTTP GET responses by using the okhttp disk cache.
 
 Main purpose to use this is to 
 1) Enforce the use of max-age (via network interceptor) for (static URL) HTTP GET calls to limit network use.
@@ -8,8 +8,10 @@ Main purpose to use this is to
 
 ```groovy
     // Initialize a CachingOkHttpClient
-    CachingOkHttpClient httpClient = new CachingOkHttpClient.Builder(mContext)
+    CachingOkHttpClient httpClient = new CachingOkHttpClient.Builder(context/*to check network availability*/)
                 .okHttpClient(new OkHttpClient.Builder().build())
+                .maxAge(5*60/*5 minutes default*/)
+                .maxStale(60*60*24/*1 day default*/)
                 .cache("cache_name", SIZE_IN_MB)
                 .dataStore(new CachingInterfaceImpl())
                 .build();
@@ -23,7 +25,7 @@ Main purpose to use this is to
                     .get()
                     .addHeader(..., ...)
                     .build())
-                .maxAge(60/*seconds*/)
+                .maxAge(60/*1 minute for this request*/)
                 .build();
 ```
 
