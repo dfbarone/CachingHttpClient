@@ -1,6 +1,4 @@
-package com.dfbarone.cachingokhttpclient.interceptors;
-
-import com.dfbarone.cachingokhttpclient.CachingOkHttpClientUtils;
+package com.dfbarone.cachingokhttp;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -16,12 +14,12 @@ import okhttp3.Response;
  * If the same network request is sent within a minute,
  * the response is retrieved from cache.
  */
-public class CachingNetworkInterceptor implements Interceptor {
+public class CacheControlNetworkInterceptor implements Interceptor {
 
-    public static final String TAG = CachingNetworkInterceptor.class.getSimpleName();
+    public static final String TAG = CacheControlNetworkInterceptor.class.getSimpleName();
     private int maxAgeSeconds;
 
-    public CachingNetworkInterceptor(int maxAgeSeconds) {
+    public CacheControlNetworkInterceptor(int maxAgeSeconds) {
         this.maxAgeSeconds = maxAgeSeconds;
     }
 
@@ -40,7 +38,7 @@ public class CachingNetworkInterceptor implements Interceptor {
 
             // Print possible bad headers
             String[] interferingHeaders = {/*"Date",*/ "Expired", "Last-Modified", "ETag"/*", Age", "Pragma"*/};
-            CachingOkHttpClientUtils.logInterfereingHeaders(originalResponse, interferingHeaders);
+            CachingOkHttpClient.Utilities.logInterfereingHeaders(originalResponse, interferingHeaders);
 
             // Override cache control header. Using CacheControl builder hoping it may be more
             // forward compatible than hard coding '"max-age=" + maxAgeSeconds'

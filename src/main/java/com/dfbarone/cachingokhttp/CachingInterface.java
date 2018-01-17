@@ -1,4 +1,4 @@
-package com.dfbarone.cachingokhttpclient.simplepersistence;
+package com.dfbarone.cachingokhttp;
 
 import okhttp3.Request;
 import okhttp3.Response;
@@ -7,7 +7,7 @@ import okhttp3.Response;
  * Created by dominicbarone on 10/24/2017.
  */
 
-public interface SimplePersistenceInterface {
+public interface CachingInterface {
     /**
      * Store a response anywhere you like
      * @param response
@@ -20,5 +20,5 @@ public interface SimplePersistenceInterface {
      * @param request
      * @return
      */
-    Object load(Request request);
+    ResponseEntry load(Request request);
 }

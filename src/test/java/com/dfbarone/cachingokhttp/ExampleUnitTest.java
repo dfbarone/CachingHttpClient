@@ -1,4 +1,4 @@
-package com.dfbarone.cachinghttpclient.lazyrequestcache;
+package com.dfbarone.cachingokhttp;
 
 import org.junit.Test;
 

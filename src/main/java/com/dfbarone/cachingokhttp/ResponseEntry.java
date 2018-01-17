@@ -1,10 +1,10 @@
-package com.dfbarone.cachingokhttpclient.simplepersistence.json;
+package com.dfbarone.cachingokhttp;
 
 /**
  * Created by dominicbarone on 10/24/2017.
  */
 
-public class ResponsePojo {
+public class ResponseEntry {
 
     public String id;
     public String url;

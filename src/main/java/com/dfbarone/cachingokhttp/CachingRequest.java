@@ -1,4 +1,4 @@
-package com.dfbarone.cachingokhttpclient;
+package com.dfbarone.cachingokhttp;
 
 import okhttp3.Request;
 

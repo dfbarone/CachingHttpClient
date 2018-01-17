@@ -1,9 +1,10 @@
-package com.dfbarone.cachingokhttpclient.simplepersistence;
+package com.dfbarone.cachingokhttp.example;
 
 import android.content.SharedPreferences;
 import android.util.Log;
 
-import com.dfbarone.cachingokhttpclient.simplepersistence.json.ResponsePojo;
+import com.dfbarone.cachingokhttp.CachingInterface;
+import com.dfbarone.cachingokhttp.ResponseEntry;
 import com.google.gson.Gson;
 
 import okhttp3.Request;
@@ -13,7 +14,7 @@ import okhttp3.Response;
  * Created by dominicbarone on 10/24/2017.
  */
 
-public class SharedPreferencesDataStore implements SimplePersistenceInterface {
+public class SharedPreferencesDataStore implements CachingInterface {
 
     private static final String TAG = SharedPreferencesDataStore.class.getSimpleName();
 
@@ -30,14 +31,14 @@ public class SharedPreferencesDataStore implements SimplePersistenceInterface {
 
                     SharedPreferences.Editor editor = sharedPreferences.edit();
 
-                    ResponsePojo pojo = new ResponsePojo();
+                    ResponseEntry pojo = new ResponseEntry();
                     pojo.setId(response.request().url().toString());
                     pojo.setUrl(pojo.getId());
                     pojo.setBody(responseBody);
                     pojo.setTimestamp(String.valueOf(response.receivedResponseAtMillis()));
 
                     Gson gson = new Gson();
-                    String json = gson.toJson(pojo, ResponsePojo.class).toString();
+                    String json = gson.toJson(pojo, ResponseEntry.class).toString();
 
                     editor.putString(pojo.getId(), json);
                     editor.apply();
@@ -51,13 +52,13 @@ public class SharedPreferencesDataStore implements SimplePersistenceInterface {
         }
     }
 
-    public synchronized ResponsePojo load(Request request) {
+    public synchronized ResponseEntry load(Request request) {
         try {
             if (sharedPreferences != null) {
                 final String body = sharedPreferences.getString(request.url().toString(), "");
 
                 Gson gson = new Gson();
-                ResponsePojo pojo = gson.fromJson(body, ResponsePojo.class);
+                ResponseEntry pojo = gson.fromJson(body, ResponseEntry.class);
 
                 Log.d(TAG, "load " + " " + pojo.getUrl());
                 Log.d(TAG, "load " + " " + body);

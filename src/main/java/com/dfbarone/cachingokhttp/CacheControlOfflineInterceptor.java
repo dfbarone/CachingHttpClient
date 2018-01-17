@@ -1,8 +1,8 @@
-package com.dfbarone.cachingokhttpclient.interceptors;
+package com.dfbarone.cachingokhttp;
 
 import android.content.Context;
 
-import com.dfbarone.cachingokhttpclient.CachingOkHttpClientUtils;
+import com.dfbarone.cachingokhttp.CachingOkHttpClient;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -17,13 +17,13 @@ import okhttp3.Request;
  * If the same network request is sent within a minute,
  * the response is retrieved from cache.
  */
-public class CachingOfflineInterceptor implements Interceptor {
+public class CacheControlOfflineInterceptor implements Interceptor {
 
     private static final int MAX_STALE_SECONDS = 60 * 60 * 24 * 365;
     private Context mContext;
     private boolean mHasCache;
 
-    public CachingOfflineInterceptor(Context context, boolean hasCache) {
+    public CacheControlOfflineInterceptor(Context context, boolean hasCache) {
         mContext = context;
         mHasCache = hasCache;
     }
@@ -37,7 +37,7 @@ public class CachingOfflineInterceptor implements Interceptor {
     @Override
     public okhttp3.Response intercept(Chain chain) throws IOException {
         Request request = chain.request();
-        if (!CachingOkHttpClientUtils.isNetworkAvailable(mContext) && mHasCache) {
+        if (!CachingOkHttpClient.Utilities.isNetworkAvailable(mContext) && mHasCache) {
             if (request.method().equalsIgnoreCase("get")) {
                 request = chain.request().newBuilder()
                         //.header("Cache-Control", "public, only-if-cached, max-stale=" + MAX_STALE_SECONDS)

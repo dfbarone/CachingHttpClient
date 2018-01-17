@@ -1,15 +1,16 @@
-package com.dfbarone.cachingokhttpclient;
+package com.dfbarone.cachingokhttp;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.util.Log;
 
-import com.dfbarone.cachingokhttpclient.interceptors.CachingNetworkInterceptor;
-import com.dfbarone.cachingokhttpclient.interceptors.CachingOfflineInterceptor;
-import com.dfbarone.cachingokhttpclient.simplepersistence.SimplePersistenceInterface;
-import com.dfbarone.cachingokhttpclient.simplepersistence.json.ResponsePojo;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -35,7 +36,7 @@ public class CachingOkHttpClient {
     private int maxAgeSeconds;
     private int maxStaleSeconds;
     private Context context;
-    private SimplePersistenceInterface dataStore;
+    private CachingInterface dataStore;
 
     public CachingOkHttpClient(Context context) {
         this.context = context;
@@ -63,7 +64,7 @@ public class CachingOkHttpClient {
         return new Builder(this);
     }
 
-    public SimplePersistenceInterface dataStore() {
+    public CachingInterface dataStore() {
         return dataStore;
     }
 
@@ -78,9 +79,9 @@ public class CachingOkHttpClient {
 
         if (cachingRequest.maxAgeSeconds() >= 0) {
             removeInterceptor(okHttpClientBuilder.networkInterceptors(),
-                    CachingNetworkInterceptor.class);
+                    CacheControlNetworkInterceptor.class);
 
-            okHttpClientBuilder.addNetworkInterceptor(new CachingNetworkInterceptor(cachingRequest.maxAgeSeconds()));
+            okHttpClientBuilder.addNetworkInterceptor(new CacheControlNetworkInterceptor(cachingRequest.maxAgeSeconds()));
         }
 
         return okHttpClientBuilder.build()
@@ -100,9 +101,9 @@ public class CachingOkHttpClient {
         Response response = null;
         try {
             response = call.execute();
-            CachingOkHttpClientUtils.logResponse(cachingRequest.request(), response, "get");
+            logResponse(cachingRequest.request(), response, "get");
             if (dataStore != null) {
-                String payload = CachingOkHttpClientUtils.responseToString(response.peekBody(Long.MAX_VALUE).bytes());
+                String payload = CachingOkHttpClient.Utilities.responseToString(response.peekBody(Long.MAX_VALUE).bytes());
                 if (payload != null) {
                     dataStore.store(response, payload);
                 }
@@ -126,12 +127,12 @@ public class CachingOkHttpClient {
         return Observable.fromCallable(() -> {
             Call call = newCall(cachingRequest);
             Response response = call.execute();
-            CachingOkHttpClientUtils.logResponse(cachingRequest.request(), response, "get");
+            logResponse(cachingRequest.request(), response, "get");
             return response;
         })
                 .doOnNext(response -> {
                     if (dataStore != null) {
-                        String payload = CachingOkHttpClientUtils.responseToString(response.peekBody(Long.MAX_VALUE).bytes());
+                        String payload = CachingOkHttpClient.Utilities.responseToString(response.peekBody(Long.MAX_VALUE).bytes());
                         if (payload != null) {
                             dataStore.store(response, payload);
                         }
@@ -154,7 +155,7 @@ public class CachingOkHttpClient {
         String payload = null;
         Response response = getResponse(cachingRequest);
         try {
-            payload = CachingOkHttpClientUtils.responseToString(response.body().bytes());
+            payload = CachingOkHttpClient.Utilities.responseToString(response.body().bytes());
             response.close();
         } catch (IllegalArgumentException e) {
             Log.d(TAG, "getString error " + e.getMessage());
@@ -177,7 +178,7 @@ public class CachingOkHttpClient {
                 .map(response -> {
                     String payload = null;
                     try {
-                        payload = CachingOkHttpClientUtils.responseToString(response.body().bytes());
+                        payload = CachingOkHttpClient.Utilities.responseToString(response.body().bytes());
                         response.close();
                     } catch (IllegalArgumentException e) {
                         Log.d(TAG, "getString error " + e.getMessage());
@@ -220,14 +221,16 @@ public class CachingOkHttpClient {
             }
             response.close();
 
-            Object responseObj = dataStore.load(cachingRequest.request());
-            if (responseObj instanceof ResponsePojo) {
-                ResponsePojo pojo = (ResponsePojo) responseObj;
-                if (pojo.timestamp != null) {
-                    long diff = (System.currentTimeMillis() - Long.valueOf(pojo.timestamp)) / 1000;
-                    response.close();
-                    Log.d(TAG, "isExpired " + (diff > maxAge) + " " + diff + "s");
-                    return diff > maxAge;
+            if (dataStore != null) {
+                Object responseObj = dataStore.load(cachingRequest.request());
+                if (responseObj instanceof ResponseEntry) {
+                    ResponseEntry pojo = (ResponseEntry) responseObj;
+                    if (pojo.timestamp != null) {
+                        long diff = (System.currentTimeMillis() - Long.valueOf(pojo.timestamp)) / 1000;
+                        response.close();
+                        Log.d(TAG, "isExpired " + (diff > maxAge) + " " + diff + "s");
+                        return diff > maxAge;
+                    }
                 }
             }
         } catch (Exception e) {
@@ -261,6 +264,23 @@ public class CachingOkHttpClient {
         }
     }
 
+    public static void logResponse(Request request, Response response, String prefix) {
+        try {
+            if (response.networkResponse() != null && response.cacheResponse() != null) {
+                Log.d(TAG, prefix + "  cond'tnl " + response.networkResponse().code() + " " + request.url());
+            } else if (response.networkResponse() != null) {
+                Log.d(TAG, prefix + "   network " + response.networkResponse().code() + " " + request.url());
+            } else if (response.cacheResponse() != null) {
+                long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
+                Log.d(TAG, prefix + "    cached " + response.cacheResponse().code() + " " + diff + "s old" + " " + request.url());
+            } else {
+                Log.d(TAG, prefix + " not found " + response.code() + " " + response.message() + " " + request.url());
+            }
+        } catch (Exception e) {
+
+        }
+    }
+
     public static final class Builder {
 
         public static final int MAX_AGE_SECONDS = 60;
@@ -271,7 +291,7 @@ public class CachingOkHttpClient {
         private OkHttpClient okHttpClient;
         private Context context;
         private Cache cache;
-        private SimplePersistenceInterface dataStore;
+        private CachingInterface dataStore;
         private int maxAgeSeconds;
         private int maxStaleSeconds;
 
@@ -308,7 +328,7 @@ public class CachingOkHttpClient {
             return this;
         }
 
-        public Builder dataStore(SimplePersistenceInterface dataStore) {
+        public Builder dataStore(CachingInterface dataStore) {
             this.dataStore = dataStore;
             return this;
         }
@@ -348,11 +368,11 @@ public class CachingOkHttpClient {
             // Add interceptors to enforce
             // A) max-age when GET responses are cached
             // B) max-stale when GET requests are made offline
-            removeInterceptor(okHttpClientBuilder.interceptors(), CachingOfflineInterceptor.class);
-            removeInterceptor(okHttpClientBuilder.networkInterceptors(), CachingNetworkInterceptor.class);
+            removeInterceptor(okHttpClientBuilder.interceptors(), CacheControlOfflineInterceptor.class);
+            removeInterceptor(okHttpClientBuilder.networkInterceptors(), CacheControlNetworkInterceptor.class);
             okHttpClientBuilder
-                    .addNetworkInterceptor(new CachingNetworkInterceptor(maxAgeSeconds))
-                    .addInterceptor(new CachingOfflineInterceptor(context, okHttpClient.cache() != null));
+                    .addNetworkInterceptor(new CacheControlNetworkInterceptor(maxAgeSeconds))
+                    .addInterceptor(new CacheControlOfflineInterceptor(context, okHttpClient.cache() != null));
 
             // Retry can't hurt? right?
             okHttpClientBuilder.retryOnConnectionFailure(true);
@@ -384,6 +404,72 @@ public class CachingOkHttpClient {
             }
             return rootCache;
         }
+    }
+
+    public static class Utilities {
+
+        private static final String TAG = Utilities.class.getSimpleName();
+
+        public static boolean isNetworkAvailable(Context context) {
+            try {
+                ConnectivityManager cm =
+                        (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+                NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                if (activeNetwork != null && activeNetwork.isConnectedOrConnecting()) {
+                    return true;
+                } else {
+                    return false;
+                }
+            } catch (Exception e) {
+                Log.d(TAG, e.getMessage());
+            }
+            return false;
+        }
+
+        public static void logInterfereingHeaders(Response originalResponse, String... interferingHeaders) {
+            for (String key : interferingHeaders) {
+                if (originalResponse.headers().get(key) != null) {
+                    Log.d(TAG, "Header " + key + " " + originalResponse.headers().get(key));
+                }
+            }
+        }
+
+        public static String responseToString(byte[] bytes) {
+            String payload = null;
+            try {
+                if (bytes != null) {
+                    payload = new String(bytes, "UTF-8");
+                }
+            } catch (UnsupportedEncodingException e) {
+
+            } catch (Exception e) {
+
+            }
+            return payload;
+        }
+
+        public static <T> T jsonToGson(final String jsonString, Class<T> clazz) {
+            T var = null;
+            try {
+                Gson gson = new Gson();
+                var = gson.fromJson(jsonString, clazz);
+            } catch (JsonSyntaxException e) {
+                Log.d(TAG, e.getMessage());
+            }
+            return var;
+        }
+
+        public static <T> String gsonToJson(final T data, Class<T> clazz) {
+            String var = null;
+            try {
+                Gson gson = new Gson();
+                var = gson.toJson(data, clazz);
+            } catch (JsonSyntaxException e) {
+                Log.d(TAG, e.getMessage());
+            }
+            return var;
+        }
+
     }
 
 }
