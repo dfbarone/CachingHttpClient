@@ -445,28 +445,6 @@ public class CachingOkHttpClient {
             return payload;
         }
 
-        public static <T> T jsonToGson(final String jsonString, Class<T> clazz) {
-            T var = null;
-            try {
-                Gson gson = new Gson();
-                var = gson.fromJson(jsonString, clazz);
-            } catch (JsonSyntaxException e) {
-                Log.d(TAG, e.getMessage());
-            }
-            return var;
-        }
-
-        public static <T> String gsonToJson(final T data, Class<T> clazz) {
-            String var = null;
-            try {
-                Gson gson = new Gson();
-                var = gson.toJson(data, clazz);
-            } catch (JsonSyntaxException e) {
-                Log.d(TAG, e.getMessage());
-            }
-            return var;
-        }
-
     }
 
 }
