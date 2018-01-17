@@ -222,15 +222,12 @@ public class CachingOkHttpClient {
             response.close();
 
             if (dataStore != null) {
-                Object responseObj = dataStore.load(cachingRequest.request());
-                if (responseObj instanceof ResponseEntry) {
-                    ResponseEntry pojo = (ResponseEntry) responseObj;
-                    if (pojo.timestamp != null) {
-                        long diff = (System.currentTimeMillis() - Long.valueOf(pojo.timestamp)) / 1000;
-                        response.close();
-                        Log.d(TAG, "isExpired " + (diff > maxAge) + " " + diff + "s");
-                        return diff > maxAge;
-                    }
+                ResponseEntryInterface responseEntry = dataStore.load(cachingRequest.request());
+                if (responseEntry.getReceivedResponseAtMillis() > 0) {
+                    long diff = (System.currentTimeMillis() - responseEntry.getReceivedResponseAtMillis()) / 1000;
+                    response.close();
+                    Log.d(TAG, "isExpired " + (diff > maxAge) + " " + diff + "s");
+                    return diff > maxAge;
                 }
             }
         } catch (Exception e) {
