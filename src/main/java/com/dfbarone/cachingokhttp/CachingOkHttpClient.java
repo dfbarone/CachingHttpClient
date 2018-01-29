@@ -13,6 +13,8 @@ import com.dfbarone.cachingokhttp.persistence.IResponseCacheEntry;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -37,7 +39,7 @@ public class CachingOkHttpClient {
     private int maxAgeSeconds;
     private int maxStaleSeconds;
     private Context context;
-    private IResponseCache dataStore;
+    private List<IResponseCache> dataStores;
     private IResponseParser responseParser;
 
     public CachingOkHttpClient(Context context) {
@@ -46,7 +48,7 @@ public class CachingOkHttpClient {
         okHttpClient = builder.okHttpClient;
         maxAgeSeconds = builder.maxAgeSeconds;
         maxStaleSeconds = builder.maxStaleSeconds;
-        dataStore = builder.dataStore;
+        dataStores = builder.dataStores;
         responseParser = builder.responseParser;
     }
 
@@ -56,7 +58,7 @@ public class CachingOkHttpClient {
         this.okHttpClient = builder.okHttpClient;
         this.maxAgeSeconds = builder.maxAgeSeconds;
         this.maxStaleSeconds = builder.maxStaleSeconds;
-        this.dataStore = builder.dataStore;
+        this.dataStores = builder.dataStores;
         this.responseParser = builder.responseParser;
     }
 
@@ -66,10 +68,6 @@ public class CachingOkHttpClient {
 
     public CachingOkHttpClient.Builder newBuilder() {
         return new Builder(this);
-    }
-
-    public IResponseCache dataStore() {
-        return dataStore;
     }
 
     /**
@@ -106,7 +104,7 @@ public class CachingOkHttpClient {
         try {
             response = call.execute();
             logResponse(cachingRequest.request(), response, "get");
-            if (dataStore != null) {
+            if (dataStores != null) {
                 store(response);
             }
         } catch (IOException e) {
@@ -132,7 +130,7 @@ public class CachingOkHttpClient {
             return response;
         })
                 .doOnSuccess(response -> {
-                    if (dataStore != null) {
+                    if (dataStores != null) {
                         store(response);
                     }
                 })
@@ -273,15 +271,15 @@ public class CachingOkHttpClient {
             }
             response.close();
 
-            if (dataStore != null) {
-                IResponseCacheEntry responseEntry = dataStore.load(cachingRequest.request());
-                if (responseEntry.getReceivedResponseAtMillis() > 0) {
-                    long diff = (System.currentTimeMillis() - responseEntry.getReceivedResponseAtMillis()) / 1000;
-                    response.close();
-                    Log.d(TAG, "isExpired " + (diff > maxAge) + " " + diff + "s");
-                    return diff > maxAge;
-                }
+
+            IResponseCacheEntry responseEntry = load(cachingRequest.request());
+            if (responseEntry.getReceivedResponseAtMillis() > 0) {
+                long diff = (System.currentTimeMillis() - responseEntry.getReceivedResponseAtMillis()) / 1000;
+                response.close();
+                Log.d(TAG, "isExpired " + (diff > maxAge) + " " + diff + "s");
+                return diff > maxAge;
             }
+
         } catch (Exception e) {
             Log.d(TAG, "isExpired error " + e.getMessage());
         }
@@ -289,18 +287,25 @@ public class CachingOkHttpClient {
         return true;
     }
 
-    public IResponseCacheEntry load(Request request) {
-        if (dataStore != null && request != null) {
-            return dataStore.load(request);
+    public IResponseCacheEntry load(final Request request) {
+        if (dataStores != null && dataStores.size() > 0 && request != null) {
+            for (IResponseCache cache : dataStores) {
+                IResponseCacheEntry entry = cache.load(request);
+                if (entry != null) {
+                    return entry;
+                }
+            }
         }
         return null;
     }
 
     public void store(Response response) throws IOException {
-        if (dataStore != null && response != null) {
+        if (dataStores != null && dataStores.size() > 0 && response != null) {
             String body = response.peekBody(Long.MAX_VALUE).string();
             if (body != null) {
-                dataStore.store(response, body);
+                for (IResponseCache cache : dataStores) {
+                    cache.store(response, body);
+                }
             }
         }
     }
@@ -356,7 +361,7 @@ public class CachingOkHttpClient {
         private OkHttpClient okHttpClient;
         private Context context;
         private Cache cache;
-        private IResponseCache dataStore;
+        private List<IResponseCache> dataStores;
         private IResponseParser responseParser;
         private int maxAgeSeconds;
         private int maxStaleSeconds;
@@ -365,7 +370,7 @@ public class CachingOkHttpClient {
             this.context = context.getApplicationContext();
             this.okHttpClient = null;
             this.cache = null;
-            this.dataStore = null;
+            this.dataStores = new ArrayList<>();
             this.responseParser = null;
             this.maxAgeSeconds = MAX_AGE_SECONDS;
             this.maxStaleSeconds = MAX_STALE_SECONDS;
@@ -375,7 +380,7 @@ public class CachingOkHttpClient {
             this.context = cachingOkHttpClient.context;
             this.okHttpClient = cachingOkHttpClient.okHttpClient();
             this.cache = null;
-            this.dataStore = null;
+            this.dataStores = new ArrayList<>();
             this.responseParser = null;
             this.maxAgeSeconds = cachingOkHttpClient.maxAgeSeconds;
             this.maxStaleSeconds = cachingOkHttpClient.maxStaleSeconds;
@@ -397,7 +402,14 @@ public class CachingOkHttpClient {
         }
 
         public Builder dataStore(IResponseCache dataStore) {
-            this.dataStore = dataStore;
+            List<IResponseCache> newList = new ArrayList<>();
+            newList.add(dataStore);
+            this.dataStores = newList;
+            return this;
+        }
+
+        public Builder dataStore(IResponseCache... dataStore) {
+            this.dataStores = new ArrayList<>(Arrays.asList(dataStore));;
             return this;
         }
 
