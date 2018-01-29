@@ -1,4 +1,4 @@
-package com.dfbarone.cachingokhttp;
+package com.dfbarone.cachingokhttp.interceptors;
 
 import android.content.Context;
 

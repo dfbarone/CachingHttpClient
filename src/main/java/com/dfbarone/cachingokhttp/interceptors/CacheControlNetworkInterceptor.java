@@ -1,4 +1,6 @@
-package com.dfbarone.cachingokhttp;
+package com.dfbarone.cachingokhttp.interceptors;
+
+import com.dfbarone.cachingokhttp.CachingOkHttpClient;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;

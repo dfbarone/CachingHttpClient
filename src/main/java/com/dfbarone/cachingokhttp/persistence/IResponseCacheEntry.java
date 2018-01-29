@@ -1,10 +1,10 @@
-package com.dfbarone.cachingokhttp;
+package com.dfbarone.cachingokhttp.persistence;
 
 /**
  * Created by dfbarone on 1/17/18.
  */
 
-public interface ResponseEntryInterface {
+public interface IResponseCacheEntry {
 
     public String getUrl();
 

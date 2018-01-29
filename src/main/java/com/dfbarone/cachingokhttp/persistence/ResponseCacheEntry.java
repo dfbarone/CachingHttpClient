@@ -1,15 +1,15 @@
-package com.dfbarone.cachingokhttp;
+package com.dfbarone.cachingokhttp.persistence;
 
 /**
  * Created by dfbarone on 10/24/2017.
  */
 
-public class ResponseEntry implements ResponseEntryInterface {
+public class ResponseCacheEntry implements IResponseCacheEntry {
 
-    public String url;
-    public String body;
-    public long receivedResponseAtMillis;
-    public String tag;
+    public String url = "";
+    public String body = "";
+    public long receivedResponseAtMillis = -1;
+    public String tag = "";
 
     public String getUrl() {
         return url;

@@ -3,17 +3,18 @@ package com.dfbarone.cachingokhttp.example;
 import android.content.SharedPreferences;
 import android.util.Log;
 
-import com.dfbarone.cachingokhttp.CachingInterface;
-import com.dfbarone.cachingokhttp.ResponseEntry;
+import com.dfbarone.cachingokhttp.persistence.IResponseCache;
+import com.dfbarone.cachingokhttp.persistence.IResponseCacheEntry;
+import com.dfbarone.cachingokhttp.persistence.ResponseCacheEntry;
 
 import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * Created by dominicbarone on 10/24/2017.
+ * Created by dfbarone on 10/24/2017.
  */
 
-public class SharedPreferencesDataStore implements CachingInterface {
+public class SharedPreferencesDataStore implements IResponseCache {
 
     private static final String TAG = SharedPreferencesDataStore.class.getSimpleName();
 
@@ -30,7 +31,7 @@ public class SharedPreferencesDataStore implements CachingInterface {
 
                     SharedPreferences.Editor editor = sharedPreferences.edit();
 
-                    ResponseEntry pojo = new ResponseEntry();
+                    IResponseCacheEntry pojo = new ResponseCacheEntry();
                     pojo.setUrl(response.request().url().toString());
                     pojo.setBody(responseBody);
                     pojo.setReceivedResponseAtMillis(response.receivedResponseAtMillis());
@@ -50,7 +51,7 @@ public class SharedPreferencesDataStore implements CachingInterface {
         }
     }
 
-    public synchronized ResponseEntry load(Request request) {
+    public synchronized IResponseCacheEntry load(Request request) {
         try {
             if (sharedPreferences != null) {
                 final String body = sharedPreferences.getString(request.url().toString(), "");

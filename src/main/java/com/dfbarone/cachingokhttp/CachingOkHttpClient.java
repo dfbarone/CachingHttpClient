@@ -5,16 +5,17 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.util.Log;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
+import com.dfbarone.cachingokhttp.interceptors.CacheControlNetworkInterceptor;
+import com.dfbarone.cachingokhttp.interceptors.CacheControlOfflineInterceptor;
+import com.dfbarone.cachingokhttp.parsing.IResponseParser;
+import com.dfbarone.cachingokhttp.persistence.IResponseCache;
+import com.dfbarone.cachingokhttp.persistence.IResponseCacheEntry;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import io.reactivex.Observable;
 import io.reactivex.Single;
 import okhttp3.Cache;
 import okhttp3.CacheControl;
@@ -26,7 +27,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /**
- * Created by dominicbarone on 6/19/17.
+ * Created by dfbarone on 6/19/17.
  */
 
 public class CachingOkHttpClient {
@@ -36,7 +37,8 @@ public class CachingOkHttpClient {
     private int maxAgeSeconds;
     private int maxStaleSeconds;
     private Context context;
-    private CachingInterface dataStore;
+    private IResponseCache dataStore;
+    private IResponseParser responseParser;
 
     public CachingOkHttpClient(Context context) {
         this.context = context;
@@ -45,6 +47,7 @@ public class CachingOkHttpClient {
         maxAgeSeconds = builder.maxAgeSeconds;
         maxStaleSeconds = builder.maxStaleSeconds;
         dataStore = builder.dataStore;
+        responseParser = builder.responseParser;
     }
 
     // For calling inside Builder.build() method
@@ -54,6 +57,7 @@ public class CachingOkHttpClient {
         this.maxAgeSeconds = builder.maxAgeSeconds;
         this.maxStaleSeconds = builder.maxStaleSeconds;
         this.dataStore = builder.dataStore;
+        this.responseParser = builder.responseParser;
     }
 
     public OkHttpClient okHttpClient() {
@@ -64,7 +68,7 @@ public class CachingOkHttpClient {
         return new Builder(this);
     }
 
-    public CachingInterface dataStore() {
+    public IResponseCache dataStore() {
         return dataStore;
     }
 
@@ -98,15 +102,12 @@ public class CachingOkHttpClient {
      */
     public Response getResponse(CachingRequest cachingRequest) throws IOException {
         Call call = newCall(cachingRequest);
-        Response response = null;
+        Response response;
         try {
             response = call.execute();
             logResponse(cachingRequest.request(), response, "get");
             if (dataStore != null) {
-                String payload = CachingOkHttpClient.Utilities.responseToString(response.peekBody(Long.MAX_VALUE).bytes());
-                if (payload != null) {
-                    dataStore.store(response, payload);
-                }
+                store(response);
             }
         } catch (IOException e) {
             Log.d(TAG, "getString error " + e.getMessage());
@@ -123,19 +124,16 @@ public class CachingOkHttpClient {
      * @param cachingRequest standard okhttp3 request for GET call
      * @return Response
      */
-    public Observable<Response> getResponseAsync(final CachingRequest cachingRequest) {
-        return Observable.fromCallable(() -> {
+    public Single<Response> getResponseAsync(final CachingRequest cachingRequest) {
+        return Single.fromCallable(() -> {
             Call call = newCall(cachingRequest);
             Response response = call.execute();
             logResponse(cachingRequest.request(), response, "get");
             return response;
         })
-                .doOnNext(response -> {
+                .doOnSuccess(response -> {
                     if (dataStore != null) {
-                        String payload = CachingOkHttpClient.Utilities.responseToString(response.peekBody(Long.MAX_VALUE).bytes());
-                        if (payload != null) {
-                            dataStore.store(response, payload);
-                        }
+                        store(response);
                     }
                 })
                 .doOnError(error -> {
@@ -155,7 +153,7 @@ public class CachingOkHttpClient {
         String payload = null;
         Response response = getResponse(cachingRequest);
         try {
-            payload = CachingOkHttpClient.Utilities.responseToString(response.body().bytes());
+            payload = response.body().string();
             response.close();
         } catch (IllegalArgumentException e) {
             Log.d(TAG, "getString error " + e.getMessage());
@@ -174,11 +172,11 @@ public class CachingOkHttpClient {
      * @return String response body
      */
     public Single<String> getStringAsync(final CachingRequest cachingRequest) {
-        return Single.fromObservable(getResponseAsync(cachingRequest)
+        return getResponseAsync(cachingRequest)
                 .map(response -> {
                     String payload = null;
                     try {
-                        payload = CachingOkHttpClient.Utilities.responseToString(response.body().bytes());
+                        payload = response.body().string();
                         response.close();
                     } catch (IllegalArgumentException e) {
                         Log.d(TAG, "getString error " + e.getMessage());
@@ -186,7 +184,61 @@ public class CachingOkHttpClient {
                         Log.d(TAG, "getString error " + e.getMessage());
                     }
                     return payload;
-                }));
+                });
+    }
+
+    /**
+     * Caching enabled http GET based on max age.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     *
+     * @param cachingRequest standard okhttp3 request for GET call
+     * @return String response body
+     */
+    public <T> T get(CachingRequest cachingRequest, final Class<T> clazz) throws IOException {
+        T payload = null;
+        Response response = getResponse(cachingRequest);
+        try {
+            if (cachingRequest.responseParser() != null) {
+                payload = cachingRequest.responseParser().fromString(response.body().string(), clazz);
+            } else {
+                payload = responseParser.fromString(response.body().string(), clazz);
+            }
+            response.close();
+        } catch (IllegalArgumentException e) {
+            Log.d(TAG, "get error " + e.getMessage());
+        } catch (Exception e) {
+            Log.d(TAG, "get error " + e.getMessage());
+        }
+        return payload;
+    }
+
+    /**
+     * Caching enabled http GET based on max age.
+     * CacheControl.maxAgeSeconds is required to set maxAge of the response
+     * if it is not set it will default to 60s
+     *
+     * @param cachingRequest standard okhttp3 request for GET call
+     * @return String response body
+     */
+    public <T> Single<T> getAsync(final CachingRequest cachingRequest, final Class<T> clazz) {
+        return getResponseAsync(cachingRequest)
+                .map(response -> {
+                    T payload = null;
+                    try {
+                        if (cachingRequest.responseParser() != null) {
+                            payload = cachingRequest.responseParser().fromString(response.body().string(), clazz);
+                        } else {
+                            payload = responseParser.fromString(response.body().string(), clazz);
+                        }
+                        response.close();
+                    } catch (IllegalArgumentException e) {
+                        Log.d(TAG, "getAsync error " + e.getMessage());
+                    } catch (Exception e) {
+                        Log.d(TAG, "getAsync error " + e.getMessage());
+                    }
+                    return payload;
+                });
     }
 
     /**
@@ -222,7 +274,7 @@ public class CachingOkHttpClient {
             response.close();
 
             if (dataStore != null) {
-                ResponseEntryInterface responseEntry = dataStore.load(cachingRequest.request());
+                IResponseCacheEntry responseEntry = dataStore.load(cachingRequest.request());
                 if (responseEntry.getReceivedResponseAtMillis() > 0) {
                     long diff = (System.currentTimeMillis() - responseEntry.getReceivedResponseAtMillis()) / 1000;
                     response.close();
@@ -234,7 +286,23 @@ public class CachingOkHttpClient {
             Log.d(TAG, "isExpired error " + e.getMessage());
         }
         Log.d(TAG, "isExpired " + true);
-        return false;
+        return true;
+    }
+
+    public IResponseCacheEntry load(Request request) {
+        if (dataStore != null && request != null) {
+            return dataStore.load(request);
+        }
+        return null;
+    }
+
+    public void store(Response response) throws IOException {
+        if (dataStore != null && response != null) {
+            String body = response.peekBody(Long.MAX_VALUE).string();
+            if (body != null) {
+                dataStore.store(response, body);
+            }
+        }
     }
 
     private static void cancel(OkHttpClient client, Object tag) {
@@ -249,19 +317,19 @@ public class CachingOkHttpClient {
     /**
      * Remove all instances of a specific type of interceptor.
      *
-     * @param intereceptors a list of interceptors
+     * @param interceptors a list of interceptors
      * @param clazz the class type of new interceptor
      * @param <T>
      */
-    public static <T> void removeInterceptor(List<Interceptor> intereceptors, Class<T> clazz) {
-        for (Interceptor i : intereceptors) {
+    private static <T> void removeInterceptor(List<Interceptor> interceptors, Class<T> clazz) {
+        for (Interceptor i : interceptors) {
             if (clazz.isInstance(i)) {
-                intereceptors.remove(i);
+                interceptors.remove(i);
             }
         }
     }
 
-    public static void logResponse(Request request, Response response, String prefix) {
+    private static void logResponse(Request request, Response response, String prefix) {
         try {
             if (response.networkResponse() != null && response.cacheResponse() != null) {
                 Log.d(TAG, prefix + "  cond'tnl " + response.networkResponse().code() + " " + request.url());
@@ -288,7 +356,8 @@ public class CachingOkHttpClient {
         private OkHttpClient okHttpClient;
         private Context context;
         private Cache cache;
-        private CachingInterface dataStore;
+        private IResponseCache dataStore;
+        private IResponseParser responseParser;
         private int maxAgeSeconds;
         private int maxStaleSeconds;
 
@@ -297,6 +366,7 @@ public class CachingOkHttpClient {
             this.okHttpClient = null;
             this.cache = null;
             this.dataStore = null;
+            this.responseParser = null;
             this.maxAgeSeconds = MAX_AGE_SECONDS;
             this.maxStaleSeconds = MAX_STALE_SECONDS;
         }
@@ -306,6 +376,7 @@ public class CachingOkHttpClient {
             this.okHttpClient = cachingOkHttpClient.okHttpClient();
             this.cache = null;
             this.dataStore = null;
+            this.responseParser = null;
             this.maxAgeSeconds = cachingOkHttpClient.maxAgeSeconds;
             this.maxStaleSeconds = cachingOkHttpClient.maxStaleSeconds;
         }
@@ -325,8 +396,13 @@ public class CachingOkHttpClient {
             return this;
         }
 
-        public Builder dataStore(CachingInterface dataStore) {
+        public Builder dataStore(IResponseCache dataStore) {
             this.dataStore = dataStore;
+            return this;
+        }
+
+        public Builder responseParser(IResponseParser responseParser) {
+            this.responseParser = responseParser;
             return this;
         }
 
@@ -429,20 +505,6 @@ public class CachingOkHttpClient {
                     Log.d(TAG, "Header " + key + " " + originalResponse.headers().get(key));
                 }
             }
-        }
-
-        public static String responseToString(byte[] bytes) {
-            String payload = null;
-            try {
-                if (bytes != null) {
-                    payload = new String(bytes, "UTF-8");
-                }
-            } catch (UnsupportedEncodingException e) {
-
-            } catch (Exception e) {
-
-            }
-            return payload;
         }
 
     }
