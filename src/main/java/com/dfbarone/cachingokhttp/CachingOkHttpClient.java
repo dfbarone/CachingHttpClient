@@ -34,8 +34,8 @@ import okhttp3.Response;
 
 public class CachingOkHttpClient {
 
-    private OkHttpClient okHttpClient;
     private static final String TAG = CachingOkHttpClient.class.getSimpleName();
+    private OkHttpClient okHttpClient;
     private int maxAgeSeconds;
     private int maxStaleSeconds;
     private Context context;
@@ -60,6 +60,47 @@ public class CachingOkHttpClient {
         this.maxStaleSeconds = builder.maxStaleSeconds;
         this.dataStores = builder.dataStores;
         this.responseParser = builder.responseParser;
+    }
+
+    private static void cancel(OkHttpClient client, Object tag) {
+        for (Call call : client.dispatcher().queuedCalls()) {
+            if (tag.equals(call.request().tag())) call.cancel();
+        }
+        for (Call call : client.dispatcher().runningCalls()) {
+            if (tag.equals(call.request().tag())) call.cancel();
+        }
+    }
+
+    /**
+     * Remove all instances of a specific type of interceptor.
+     *
+     * @param interceptors a list of interceptors
+     * @param clazz        the class type of new interceptor
+     * @param <T>
+     */
+    private static <T> void removeInterceptor(List<Interceptor> interceptors, Class<T> clazz) {
+        for (Interceptor i : interceptors) {
+            if (clazz.isInstance(i)) {
+                interceptors.remove(i);
+            }
+        }
+    }
+
+    private static void logResponse(Request request, Response response, String prefix) {
+        try {
+            if (response.networkResponse() != null && response.cacheResponse() != null) {
+                Log.d(TAG, prefix + "  cond'tnl " + response.networkResponse().code() + " " + request.url());
+            } else if (response.networkResponse() != null) {
+                Log.d(TAG, prefix + "   network " + response.networkResponse().code() + " " + request.url());
+            } else if (response.cacheResponse() != null) {
+                long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
+                Log.d(TAG, prefix + "    cached " + response.cacheResponse().code() + " " + diff + "s old" + " " + request.url());
+            } else {
+                Log.d(TAG, prefix + " not found " + response.code() + " " + response.message() + " " + request.url());
+            }
+        } catch (Exception e) {
+
+        }
     }
 
     public OkHttpClient okHttpClient() {
@@ -96,117 +137,35 @@ public class CachingOkHttpClient {
      * if it is not set it will default to 60s
      *
      * @param cachingRequest standard okhttp3 request for GET call
-     * @return Response
+     * @return String response body
      */
-    public Response getResponse(CachingRequest cachingRequest) throws IOException {
-        Call call = newCall(cachingRequest);
-        Response response;
+    public <T> T get(final CachingRequest cachingRequest, final Class<T> clazz) throws IOException, IllegalArgumentException {
+        T payload = null;
+        Response response = null;
         try {
+            // Make web request
+            Call call = newCall(cachingRequest);
             response = call.execute();
+            // Log result
             logResponse(cachingRequest.request(), response, "get");
-            if (dataStores != null) {
+            // Cache data
+            if (dataStores != null && cachingRequest.request().method().equalsIgnoreCase("get")) {
                 store(response);
             }
+            // Attempt to parse response body
+            payload = parse(cachingRequest, response, clazz);
         } catch (IOException e) {
-            Log.d(TAG, "getString error " + e.getMessage());
+            Log.d(TAG, "get error " + e.getMessage());
             throw e;
-        }
-        return response;
-    }
-
-    /**
-     * Caching enabled http GET based on max age.
-     * CacheControl.maxAgeSeconds is required to set maxAge of the response
-     * if it is not set it will default to 60s
-     *
-     * @param cachingRequest standard okhttp3 request for GET call
-     * @return Response
-     */
-    public Single<Response> getResponseAsync(final CachingRequest cachingRequest) {
-        return Single.fromCallable(() -> {
-            Call call = newCall(cachingRequest);
-            Response response = call.execute();
-            logResponse(cachingRequest.request(), response, "get");
-            return response;
-        })
-                .doOnSuccess(response -> {
-                    if (dataStores != null) {
-                        store(response);
-                    }
-                })
-                .doOnError(error -> {
-                    Log.d(TAG, "getString error " + error.getMessage());
-                });
-    }
-
-    /**
-     * Caching enabled http GET based on max age.
-     * CacheControl.maxAgeSeconds is required to set maxAge of the response
-     * if it is not set it will default to 60s
-     *
-     * @param cachingRequest standard okhttp3 request for GET call
-     * @return String response body
-     */
-    public String getString(CachingRequest cachingRequest) throws IOException {
-        String payload = null;
-        Response response = getResponse(cachingRequest);
-        try {
-            payload = response.body().string();
-            response.close();
         } catch (IllegalArgumentException e) {
-            Log.d(TAG, "getString error " + e.getMessage());
+            Log.d(TAG, "get error " + e.getMessage());
+            throw e;
         } catch (Exception e) {
-            Log.d(TAG, "getString error " + e.getMessage());
-        }
-        return payload;
-    }
-
-    /**
-     * Caching enabled http GET based on max age.
-     * CacheControl.maxAgeSeconds is required to set maxAge of the response
-     * if it is not set it will default to 60s
-     *
-     * @param cachingRequest standard okhttp3 request for GET call
-     * @return String response body
-     */
-    public Single<String> getStringAsync(final CachingRequest cachingRequest) {
-        return getResponseAsync(cachingRequest)
-                .map(response -> {
-                    String payload = null;
-                    try {
-                        payload = response.body().string();
-                        response.close();
-                    } catch (IllegalArgumentException e) {
-                        Log.d(TAG, "getString error " + e.getMessage());
-                    } catch (Exception e) {
-                        Log.d(TAG, "getString error " + e.getMessage());
-                    }
-                    return payload;
-                });
-    }
-
-    /**
-     * Caching enabled http GET based on max age.
-     * CacheControl.maxAgeSeconds is required to set maxAge of the response
-     * if it is not set it will default to 60s
-     *
-     * @param cachingRequest standard okhttp3 request for GET call
-     * @return String response body
-     */
-    public <T> T get(CachingRequest cachingRequest, final Class<T> clazz) throws IOException {
-        T payload = null;
-        Response response = getResponse(cachingRequest);
-        try {
-            if (cachingRequest.responseParser() != null) {
-                payload = cachingRequest.responseParser().fromString(response.body().string(), clazz);
-            } else {
-                payload = responseParser.fromString(response.body().string(), clazz);
+            Log.d(TAG, "get error " + e.getMessage());
+        } finally {
+            if (response != null) {
+                response.close();
             }
-            response.close();
-        } catch (IllegalArgumentException e) {
-            Log.d(TAG, "get error " + e.getMessage());
-        } catch (Exception e) {
-            Log.d(TAG, "get error " + e.getMessage());
         }
         return payload;
     }
@@ -220,23 +179,41 @@ public class CachingOkHttpClient {
      * @return String response body
      */
     public <T> Single<T> getAsync(final CachingRequest cachingRequest, final Class<T> clazz) {
-        return getResponseAsync(cachingRequest)
-                .map(response -> {
-                    T payload = null;
-                    try {
-                        if (cachingRequest.responseParser() != null) {
-                            payload = cachingRequest.responseParser().fromString(response.body().string(), clazz);
-                        } else {
-                            payload = responseParser.fromString(response.body().string(), clazz);
-                        }
-                        response.close();
-                    } catch (IllegalArgumentException e) {
-                        Log.d(TAG, "getAsync error " + e.getMessage());
-                    } catch (Exception e) {
-                        Log.d(TAG, "getAsync error " + e.getMessage());
-                    }
-                    return payload;
-                });
+        return Single.fromCallable(() -> get(cachingRequest, clazz));
+    }
+
+    public <T> T fetch(final CachingRequest cachingRequest, final Class<T> clazz) throws IOException, IllegalArgumentException {
+
+        // Force network
+        Request newRequest = cachingRequest.request().newBuilder()
+                .cacheControl(CacheControl.FORCE_NETWORK)
+                .build();
+
+        // Rebuild cachingRequest
+        CachingRequest.Builder newCachingRequestBuilder = new CachingRequest.Builder(cachingRequest);
+        newCachingRequestBuilder.request = newRequest;
+
+        return get(newCachingRequestBuilder.build(), clazz);
+    }
+
+    public <T> Single<T> fetchAsync(final CachingRequest cachingRequest, final Class<T> clazz) {
+        return Single.fromCallable(() -> fetch(cachingRequest, clazz));
+    }
+
+    public <T> T parse(CachingRequest cachingRequest, Response response, Class<T> clazz) throws IOException {
+        T result;
+        if (clazz == Response.class) {
+            result = (T) response;
+        } else if (clazz == String.class) {
+            result = (T) response.body().string();
+        } else {
+            if (cachingRequest.responseParser() != null) {
+                result = cachingRequest.responseParser().fromString(response.body().string(), clazz);
+            } else {
+                result = responseParser.fromString(response.body().string(), clazz);
+            }
+        }
+        return result;
     }
 
     /**
@@ -261,7 +238,6 @@ public class CachingOkHttpClient {
 
             Call call = okHttpClient.newCall(newRequest);
             Response response = call.execute();
-            //logResponse(newRequest, response, "isExpired");
 
             if (response != null && response.cacheResponse() != null && response.isSuccessful()) {
                 long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
@@ -270,7 +246,6 @@ public class CachingOkHttpClient {
                 return diff > maxAge;
             }
             response.close();
-
 
             IResponseCacheEntry responseEntry = load(cachingRequest.request());
             if (responseEntry.getReceivedResponseAtMillis() > 0) {
@@ -299,6 +274,18 @@ public class CachingOkHttpClient {
         return null;
     }
 
+    public <T> T load(final CachingRequest cachingRequest, final Class<T> clazz) {
+        IResponseCacheEntry dbResponseBody = load(cachingRequest.request());
+        if (dbResponseBody != null && dbResponseBody.getBody() != null) {
+            if (cachingRequest.responseParser() != null) {
+                return cachingRequest.responseParser().fromString(dbResponseBody.getBody(), clazz);
+            } else if (responseParser != null) {
+                return responseParser.fromString(dbResponseBody.getBody(), clazz);
+            }
+        }
+        return null;
+    }
+
     public void store(Response response) throws IOException {
         if (dataStores != null && dataStores.size() > 0 && response != null) {
             String body = response.peekBody(Long.MAX_VALUE).string();
@@ -307,47 +294,6 @@ public class CachingOkHttpClient {
                     cache.store(response, body);
                 }
             }
-        }
-    }
-
-    private static void cancel(OkHttpClient client, Object tag) {
-        for (Call call : client.dispatcher().queuedCalls()) {
-            if (tag.equals(call.request().tag())) call.cancel();
-        }
-        for (Call call : client.dispatcher().runningCalls()) {
-            if (tag.equals(call.request().tag())) call.cancel();
-        }
-    }
-
-    /**
-     * Remove all instances of a specific type of interceptor.
-     *
-     * @param interceptors a list of interceptors
-     * @param clazz the class type of new interceptor
-     * @param <T>
-     */
-    private static <T> void removeInterceptor(List<Interceptor> interceptors, Class<T> clazz) {
-        for (Interceptor i : interceptors) {
-            if (clazz.isInstance(i)) {
-                interceptors.remove(i);
-            }
-        }
-    }
-
-    private static void logResponse(Request request, Response response, String prefix) {
-        try {
-            if (response.networkResponse() != null && response.cacheResponse() != null) {
-                Log.d(TAG, prefix + "  cond'tnl " + response.networkResponse().code() + " " + request.url());
-            } else if (response.networkResponse() != null) {
-                Log.d(TAG, prefix + "   network " + response.networkResponse().code() + " " + request.url());
-            } else if (response.cacheResponse() != null) {
-                long diff = (System.currentTimeMillis() - response.receivedResponseAtMillis()) / 1000;
-                Log.d(TAG, prefix + "    cached " + response.cacheResponse().code() + " " + diff + "s old" + " " + request.url());
-            } else {
-                Log.d(TAG, prefix + " not found " + response.code() + " " + response.message() + " " + request.url());
-            }
-        } catch (Exception e) {
-
         }
     }
 
@@ -386,6 +332,23 @@ public class CachingOkHttpClient {
             this.maxStaleSeconds = cachingOkHttpClient.maxStaleSeconds;
         }
 
+        /*
+         * Utility methods
+         */
+        public static Cache getCache(Context context, String cacheDirName, int diskCacheSizeInBytes) {
+            File cacheDir = new File(getCacheDir(context), cacheDirName);
+            cacheDir.mkdirs();
+            return new Cache(cacheDir, diskCacheSizeInBytes);
+        }
+
+        private static File getCacheDir(Context context) {
+            File rootCache = context.getExternalCacheDir();
+            if (rootCache == null) {
+                rootCache = context.getCacheDir();
+            }
+            return rootCache;
+        }
+
         public Builder cache(Cache httpCache) {
             this.cache = httpCache;
             return this;
@@ -409,7 +372,7 @@ public class CachingOkHttpClient {
         }
 
         public Builder dataStore(IResponseCache... dataStore) {
-            this.dataStores = new ArrayList<>(Arrays.asList(dataStore));;
+            this.dataStores = new ArrayList<>(Arrays.asList(dataStore));
             return this;
         }
 
@@ -471,23 +434,6 @@ public class CachingOkHttpClient {
             okHttpClient = okHttpClientBuilder.build();
 
             return new CachingOkHttpClient(this);
-        }
-
-        /*
-         * Utility methods
-         */
-        public static Cache getCache(Context context, String cacheDirName, int diskCacheSizeInBytes) {
-            File cacheDir = new File(getCacheDir(context), cacheDirName);
-            cacheDir.mkdirs();
-            return new Cache(cacheDir, diskCacheSizeInBytes);
-        }
-
-        private static File getCacheDir(Context context) {
-            File rootCache = context.getExternalCacheDir();
-            if (rootCache == null) {
-                rootCache = context.getCacheDir();
-            }
-            return rootCache;
         }
     }
 
