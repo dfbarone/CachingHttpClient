@@ -14,7 +14,6 @@ import com.dfbarone.cachingokhttp.persistence.IResponseCacheEntry;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -39,7 +38,7 @@ public class CachingOkHttpClient {
     private int maxAgeSeconds;
     private int maxStaleSeconds;
     private Context context;
-    private List<IResponseCache> dataStores;
+    private List<IResponseCache> responseDataStores;
     private IResponseParser responseParser;
 
     public CachingOkHttpClient(Context context) {
@@ -48,7 +47,7 @@ public class CachingOkHttpClient {
         okHttpClient = builder.okHttpClient;
         maxAgeSeconds = builder.maxAgeSeconds;
         maxStaleSeconds = builder.maxStaleSeconds;
-        dataStores = builder.dataStores;
+        responseDataStores = builder.responseDataStores;
         responseParser = builder.responseParser;
     }
 
@@ -58,7 +57,7 @@ public class CachingOkHttpClient {
         this.okHttpClient = builder.okHttpClient;
         this.maxAgeSeconds = builder.maxAgeSeconds;
         this.maxStaleSeconds = builder.maxStaleSeconds;
-        this.dataStores = builder.dataStores;
+        this.responseDataStores = builder.responseDataStores;
         this.responseParser = builder.responseParser;
     }
 
@@ -149,7 +148,7 @@ public class CachingOkHttpClient {
             // Log result
             logResponse(cachingRequest.request(), response, "get");
             // Cache data
-            if (dataStores != null && cachingRequest.request().method().equalsIgnoreCase("get")) {
+            if (responseDataStores != null && cachingRequest.request().method().equalsIgnoreCase("get")) {
                 store(response);
             }
             // Attempt to parse response body
@@ -182,25 +181,7 @@ public class CachingOkHttpClient {
         return Single.fromCallable(() -> get(cachingRequest, clazz));
     }
 
-    public <T> T fetch(final CachingRequest cachingRequest, final Class<T> clazz) throws IOException, IllegalArgumentException {
-
-        // Force network
-        Request newRequest = cachingRequest.request().newBuilder()
-                .cacheControl(CacheControl.FORCE_NETWORK)
-                .build();
-
-        // Rebuild cachingRequest
-        CachingRequest.Builder newCachingRequestBuilder = new CachingRequest.Builder(cachingRequest);
-        newCachingRequestBuilder.request = newRequest;
-
-        return get(newCachingRequestBuilder.build(), clazz);
-    }
-
-    public <T> Single<T> fetchAsync(final CachingRequest cachingRequest, final Class<T> clazz) {
-        return Single.fromCallable(() -> fetch(cachingRequest, clazz));
-    }
-
-    public <T> T parse(CachingRequest cachingRequest, Response response, Class<T> clazz) throws IOException {
+    private <T> T parse(CachingRequest cachingRequest, Response response, Class<T> clazz) throws IOException {
         T result;
         if (clazz == Response.class) {
             result = (T) response;
@@ -262,9 +243,9 @@ public class CachingOkHttpClient {
         return true;
     }
 
-    public IResponseCacheEntry load(final Request request) {
-        if (dataStores != null && dataStores.size() > 0 && request != null) {
-            for (IResponseCache cache : dataStores) {
+    private IResponseCacheEntry load(final Request request) {
+        if (responseDataStores != null && responseDataStores.size() > 0 && request != null) {
+            for (IResponseCache cache : responseDataStores) {
                 IResponseCacheEntry entry = cache.load(request);
                 if (entry != null) {
                     return entry;
@@ -287,10 +268,10 @@ public class CachingOkHttpClient {
     }
 
     public void store(Response response) throws IOException {
-        if (dataStores != null && dataStores.size() > 0 && response != null) {
+        if (responseDataStores != null && responseDataStores.size() > 0 && response != null) {
             String body = response.peekBody(Long.MAX_VALUE).string();
             if (body != null) {
-                for (IResponseCache cache : dataStores) {
+                for (IResponseCache cache : responseDataStores) {
                     cache.store(response, body);
                 }
             }
@@ -306,8 +287,8 @@ public class CachingOkHttpClient {
 
         private OkHttpClient okHttpClient;
         private Context context;
-        private Cache cache;
-        private List<IResponseCache> dataStores;
+        private Cache okHttpClientCache;
+        private List<IResponseCache> responseDataStores;
         private IResponseParser responseParser;
         private int maxAgeSeconds;
         private int maxStaleSeconds;
@@ -315,8 +296,8 @@ public class CachingOkHttpClient {
         public Builder(Context context) {
             this.context = context.getApplicationContext();
             this.okHttpClient = null;
-            this.cache = null;
-            this.dataStores = new ArrayList<>();
+            this.okHttpClientCache = null;
+            this.responseDataStores = new ArrayList<>();
             this.responseParser = null;
             this.maxAgeSeconds = MAX_AGE_SECONDS;
             this.maxStaleSeconds = MAX_STALE_SECONDS;
@@ -325,58 +306,49 @@ public class CachingOkHttpClient {
         public Builder(CachingOkHttpClient cachingOkHttpClient) {
             this.context = cachingOkHttpClient.context;
             this.okHttpClient = cachingOkHttpClient.okHttpClient();
-            this.cache = null;
-            this.dataStores = new ArrayList<>();
+            this.okHttpClientCache = null;
+            this.responseDataStores = new ArrayList<>();
             this.responseParser = null;
             this.maxAgeSeconds = cachingOkHttpClient.maxAgeSeconds;
             this.maxStaleSeconds = cachingOkHttpClient.maxStaleSeconds;
         }
 
-        /*
-         * Utility methods
+        /**
+         * Sets the okhttp response cache to be used to read and write cached responses.
          */
-        public static Cache getCache(Context context, String cacheDirName, int diskCacheSizeInBytes) {
-            File cacheDir = new File(getCacheDir(context), cacheDirName);
-            cacheDir.mkdirs();
-            return new Cache(cacheDir, diskCacheSizeInBytes);
-        }
-
-        private static File getCacheDir(Context context) {
-            File rootCache = context.getExternalCacheDir();
-            if (rootCache == null) {
-                rootCache = context.getCacheDir();
-            }
-            return rootCache;
-        }
-
         public Builder cache(Cache httpCache) {
-            this.cache = httpCache;
+            this.okHttpClientCache = httpCache;
             return this;
         }
 
+        /**
+         * Sets the okhttp response cache to be used to read and write cached responses.
+         */
         public Builder cache(String cacheDirectory, int diskSizeInBytes) {
-            this.cache = getCache(context, cacheDirectory, diskSizeInBytes);
+            this.okHttpClientCache = CacheHelper.createCache(context, cacheDirectory, diskSizeInBytes);
             return this;
         }
 
+        /**
+         * Sets the okhttp response cache to be used to read and write cached responses.
+         */
         public Builder cache() {
-            this.cache = getCache(context, DEFAULT_CACHE_DIR, DEFAULT_DISK_SIZE_BYTES);
+            this.okHttpClientCache = CacheHelper.createCache(context, DEFAULT_CACHE_DIR, DEFAULT_DISK_SIZE_BYTES);
             return this;
         }
 
+        /**
+         * Sets the response data store to persist responses.
+         */
         public Builder dataStore(IResponseCache dataStore) {
-            List<IResponseCache> newList = new ArrayList<>();
-            newList.add(dataStore);
-            this.dataStores = newList;
+            this.responseDataStores.add(dataStore);
             return this;
         }
 
-        public Builder dataStore(IResponseCache... dataStore) {
-            this.dataStores = new ArrayList<>(Arrays.asList(dataStore));
-            return this;
-        }
-
-        public Builder responseParser(IResponseParser responseParser) {
+        /**
+         * Sets the default response parser.
+         */
+        public Builder parser(IResponseParser responseParser) {
             this.responseParser = responseParser;
             return this;
         }
@@ -409,8 +381,11 @@ public class CachingOkHttpClient {
             OkHttpClient.Builder okHttpClientBuilder = okHttpClient.newBuilder();
 
             // If cache has been set, override.
-            if (cache != null) {
-                okHttpClientBuilder.cache(cache);
+            if (okHttpClientCache != null) {
+                okHttpClientBuilder.cache(okHttpClientCache);
+            } else {
+                cache();
+                okHttpClientBuilder.cache(okHttpClientCache);
             }
 
             // Add interceptors to enforce
@@ -434,6 +409,25 @@ public class CachingOkHttpClient {
             okHttpClient = okHttpClientBuilder.build();
 
             return new CachingOkHttpClient(this);
+        }
+
+        public static class CacheHelper {
+            /*
+             * Utility methods
+             */
+            public static Cache createCache(Context context, String cacheDirName, int diskCacheSizeInBytes) {
+                File cacheDir = new File(tryGetExternalCacheDir(context), cacheDirName);
+                cacheDir.mkdirs();
+                return new Cache(cacheDir, diskCacheSizeInBytes);
+            }
+
+            private static File tryGetExternalCacheDir(Context context) {
+                File rootCache = context.getExternalCacheDir();
+                if (rootCache == null) {
+                    rootCache = context.getCacheDir();
+                }
+                return rootCache;
+            }
         }
     }
 
