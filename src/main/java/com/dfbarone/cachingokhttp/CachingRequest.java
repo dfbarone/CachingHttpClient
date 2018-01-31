@@ -60,7 +60,7 @@ public final class CachingRequest {
             return this;
         }
 
-        public CachingRequest.Builder responseParser(IResponseParser responseParser) {
+        public CachingRequest.Builder parser(IResponseParser responseParser) {
             this.responseParser = responseParser;
             return this;
         }
