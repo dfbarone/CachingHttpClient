@@ -1,10 +1,10 @@
-# CachingOkHttp
-A wrapper around okhttp to help persist HTTP GET responses by using the okhttp disk cache.
+# CachingHttp
+A wrapper around okhttp to help persist http responses.
 
 Main purpose to use this is to 
-1) Enforce the use of max-age (via network interceptor) for (static URL) HTTP GET calls to limit network use.
-2) Use http disk cache when offline (via interceptor).
-3) Optionally implement CachingInterface to persist all HTTP responses.
+1) Enforce a client side cache-control strategy via the use of max-age (via network interceptor)
+2) Make it easy to get http responses when offline (via interceptor) and use of max-stale.
+3) Persist http responses.
 
 ```groovy
     // Initialize a CachingOkHttpClient
