@@ -8,7 +8,7 @@ Main purpose to use this is to
 
 ```groovy
     // Initialize a CachingOkHttpClient
-    CachingOkHttpClient httpClient = new CachingOkHttpClient.Builder(context/*to check network availability*/)
+    CachingHttpClient httpClient = new CachingHttpClient.Builder(context/*to check network availability*/)
                 .okHttpClient(new OkHttpClient.Builder().build())
                 .cache("cache_name", SIZE_IN_MB)
                 .dataStore(new RoomResponseCache(roomDatabase.httpResponseDao()))
