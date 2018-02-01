@@ -34,7 +34,7 @@ Main purpose to use this is to
     Response response = httpClient.get(request, Response.class);
     
     // Fetch your data as a string
-    String responseBody = httpClient.getStringAsync(request, String.class)
+    httpClient.getAsync(request, String.class)
         .subscribeOn(Schedulers.io())
         .observeOn(AndroidSchedulers.mainThread())
         .subscribe();
