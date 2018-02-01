@@ -10,7 +10,7 @@ Main purpose to use this is to
     // Initialize a CachingHttpClient
     CachingHttpClient httpClient = new CachingHttpClient.Builder(context/*to check network availability*/)
                 .okHttpClient(new OkHttpClient.Builder().build())
-                .cache("cache_name", SIZE_IN_MB)
+                .cache("cache_name", 10 * 1024 * 1024 /*10MB*/)
                 .dataStore(new RoomResponseCache(roomDatabase.httpResponseDao()))
                 .parser(new GsonResponseParser(new Gson())
                 .maxAge(5*60/*5 minutes default*/)
