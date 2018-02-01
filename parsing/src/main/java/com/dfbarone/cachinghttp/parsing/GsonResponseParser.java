@@ -10,6 +10,10 @@ public class GsonResponseParser implements IResponseParser {
 
     private Gson gson;
 
+    public GsonResponseParser() {
+        this.gson = new Gson();
+    }
+
     public GsonResponseParser(Gson gson) {
         this.gson = gson;
     }
