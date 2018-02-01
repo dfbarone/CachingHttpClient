@@ -1,4 +1,4 @@
-package com.dfbarone.cachingokhttp.parsing;
+package com.dfbarone.cachinghttp.parsing;
 
 /**
  * Created by dfbarone on 1/28/2018.

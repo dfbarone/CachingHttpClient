@@ -1,15 +1,15 @@
-package com.dfbarone.cachingokhttp;
+package com.dfbarone.cachinghttp;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.util.Log;
 
-import com.dfbarone.cachingokhttp.interceptors.CacheControlNetworkInterceptor;
-import com.dfbarone.cachingokhttp.interceptors.CacheControlOfflineInterceptor;
-import com.dfbarone.cachingokhttp.parsing.IResponseParser;
-import com.dfbarone.cachingokhttp.persistence.IResponseCache;
-import com.dfbarone.cachingokhttp.persistence.IResponseCacheEntry;
+import com.dfbarone.cachinghttp.interceptors.CacheControlNetworkInterceptor;
+import com.dfbarone.cachinghttp.interceptors.CacheControlOfflineInterceptor;
+import com.dfbarone.cachinghttp.parsing.IResponseParser;
+import com.dfbarone.cachinghttp.persistence.IResponseCache;
+import com.dfbarone.cachinghttp.persistence.IResponseCacheEntry;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,9 +31,9 @@ import okhttp3.Response;
  * Created by dfbarone on 6/19/17.
  */
 
-public class CachingOkHttpClient {
+public class CachingHttpClient {
 
-    private static final String TAG = CachingOkHttpClient.class.getSimpleName();
+    private static final String TAG = CachingHttpClient.class.getSimpleName();
     private OkHttpClient okHttpClient;
     private int maxAgeSeconds;
     private int maxStaleSeconds;
@@ -41,7 +41,7 @@ public class CachingOkHttpClient {
     private List<IResponseCache> responseDataStores;
     private IResponseParser responseParser;
 
-    public CachingOkHttpClient(Context context) {
+    public CachingHttpClient(Context context) {
         this.context = context;
         Builder builder = new Builder(context);
         okHttpClient = builder.okHttpClient;
@@ -52,7 +52,7 @@ public class CachingOkHttpClient {
     }
 
     // For calling inside Builder.build() method
-    private CachingOkHttpClient(Builder builder) {
+    private CachingHttpClient(Builder builder) {
         this.context = builder.context;
         this.okHttpClient = builder.okHttpClient;
         this.maxAgeSeconds = builder.maxAgeSeconds;
@@ -106,7 +106,7 @@ public class CachingOkHttpClient {
         return okHttpClient;
     }
 
-    public CachingOkHttpClient.Builder newBuilder() {
+    public CachingHttpClient.Builder newBuilder() {
         return new Builder(this);
     }
 
@@ -303,14 +303,14 @@ public class CachingOkHttpClient {
             this.maxStaleSeconds = MAX_STALE_SECONDS;
         }
 
-        public Builder(CachingOkHttpClient cachingOkHttpClient) {
-            this.context = cachingOkHttpClient.context;
-            this.okHttpClient = cachingOkHttpClient.okHttpClient();
+        public Builder(CachingHttpClient cachingHttpClient) {
+            this.context = cachingHttpClient.context;
+            this.okHttpClient = cachingHttpClient.okHttpClient();
             this.okHttpClientCache = null;
             this.responseDataStores = new ArrayList<>();
             this.responseParser = null;
-            this.maxAgeSeconds = cachingOkHttpClient.maxAgeSeconds;
-            this.maxStaleSeconds = cachingOkHttpClient.maxStaleSeconds;
+            this.maxAgeSeconds = cachingHttpClient.maxAgeSeconds;
+            this.maxStaleSeconds = cachingHttpClient.maxStaleSeconds;
         }
 
         /**
@@ -371,7 +371,7 @@ public class CachingOkHttpClient {
             return this;
         }
 
-        public CachingOkHttpClient build() {
+        public CachingHttpClient build() {
 
             // If no default ok http client, make one.
             if (okHttpClient == null) {
@@ -408,7 +408,7 @@ public class CachingOkHttpClient {
 
             okHttpClient = okHttpClientBuilder.build();
 
-            return new CachingOkHttpClient(this);
+            return new CachingHttpClient(this);
         }
 
         public static class CacheHelper {

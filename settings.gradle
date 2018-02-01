@@ -1,1 +1,1 @@
-include ':app', ':cachinghttp'
+include ':app', ':cachinghttp', ':parsing', ':persistence'

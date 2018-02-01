@@ -1,4 +1,4 @@
-package com.dfbarone.cachingokhttp.persistence;
+package com.dfbarone.cachinghttp.persistence;
 
 import okhttp3.Request;
 import okhttp3.Response;

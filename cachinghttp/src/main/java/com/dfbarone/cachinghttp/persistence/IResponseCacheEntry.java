@@ -1,4 +1,4 @@
-package com.dfbarone.cachingokhttp.persistence;
+package com.dfbarone.cachinghttp.persistence;
 
 /**
  * Created by dfbarone on 1/17/18.

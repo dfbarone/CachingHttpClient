@@ -1,6 +1,6 @@
-package com.dfbarone.cachingokhttp;
+package com.dfbarone.cachinghttp;
 
-import com.dfbarone.cachingokhttp.parsing.IResponseParser;
+import com.dfbarone.cachinghttp.parsing.IResponseParser;
 
 import okhttp3.Request;
 

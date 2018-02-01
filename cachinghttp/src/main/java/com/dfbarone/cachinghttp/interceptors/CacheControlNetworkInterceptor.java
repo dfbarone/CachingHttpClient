@@ -1,6 +1,6 @@
-package com.dfbarone.cachingokhttp.interceptors;
+package com.dfbarone.cachinghttp.interceptors;
 
-import com.dfbarone.cachingokhttp.CachingOkHttpClient;
+import com.dfbarone.cachinghttp.CachingHttpClient;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -40,7 +40,7 @@ public class CacheControlNetworkInterceptor implements Interceptor {
 
             // Print possible bad headers
             String[] interferingHeaders = {/*"Date",*/ "Expired", "Last-Modified", "ETag"/*", Age", "Pragma"*/};
-            CachingOkHttpClient.Utilities.logInterfereingHeaders(originalResponse, interferingHeaders);
+            CachingHttpClient.Utilities.logInterfereingHeaders(originalResponse, interferingHeaders);
 
             // Override cache control header. Using CacheControl builder hoping it may be more
             // forward compatible than hard coding '"max-age=" + maxAgeSeconds'
