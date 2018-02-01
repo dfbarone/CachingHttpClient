@@ -13,7 +13,7 @@ Main purpose to use this is to
                 .maxAge(5*60/*5 minutes default*/)
                 .maxStale(60*60*24/*1 day default*/)
                 .cache("cache_name", SIZE_IN_MB)
-                .dataStore(new CachingInterfaceImpl())
+                .dataStore(new IResponseCache())
                 .build();
 ```
 
