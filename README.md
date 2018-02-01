@@ -31,10 +31,10 @@ Main purpose to use this is to
 
 ```groovy
     // Fetch your data as a string
-    httpClient.getString(request);
+    Response response = httpClient.get(request, Response.class);
     
     // Fetch your data as a string
-    httpClient.getStringAsync(request)
+    String responseBody = httpClient.getStringAsync(request, String.class)
         .subscribeOn(Schedulers.io())
         .observeOn(AndroidSchedulers.mainThread())
         .subscribe();
