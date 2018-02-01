@@ -31,7 +31,7 @@ Main purpose to use this is to
 ```
 
 ```groovy
-    // Fetch your data as a string
+    // Fetch your data as a Response
     Response response = httpClient.get(request, Response.class);
     
     // Fetch your data as a string
