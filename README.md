@@ -7,7 +7,7 @@ Main purpose to use this is to
 3) Persist http responses.
 
 ```groovy
-    // Initialize a CachingOkHttpClient
+    // Initialize a CachingHttpClient
     CachingHttpClient httpClient = new CachingHttpClient.Builder(context/*to check network availability*/)
                 .okHttpClient(new OkHttpClient.Builder().build())
                 .cache("cache_name", SIZE_IN_MB)
