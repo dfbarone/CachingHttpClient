@@ -1,19 +1,20 @@
-# CachingOkHttp
-A wrapper around okhttp to help persist HTTP GET responses by using the okhttp disk cache.
+# CachingHttp
+A wrapper around okhttp to help persist http responses.
 
 Main purpose to use this is to 
-1) Enforce the use of max-age (via network interceptor) for (static URL) HTTP GET calls to limit network use.
-2) Use http disk cache when offline (via interceptor).
-3) Optionally implement CachingInterface to persist all HTTP responses.
+1) Enforce a client side cache-control strategy via the use of max-age (via network interceptor)
+2) Make it easy to get http responses when offline (via interceptor) and use of max-stale.
+3) Persist http responses.
 
 ```groovy
-    // Initialize a CachingOkHttpClient
-    CachingOkHttpClient httpClient = new CachingOkHttpClient.Builder(context/*to check network availability*/)
+    // Initialize a CachingHttpClient
+    CachingHttpClient httpClient = new CachingHttpClient.Builder(context/*to check network availability*/)
                 .okHttpClient(new OkHttpClient.Builder().build())
+                .cache("cache_name", 10 * 1024 * 1024 /*10MB*/)
+                .dataStore(new RoomResponseCache(roomDatabase.httpResponseDao()))
+                .parser(new GsonResponseParser(new Gson())
                 .maxAge(5*60/*5 minutes default*/)
                 .maxStale(60*60*24/*1 day default*/)
-                .cache("cache_name", SIZE_IN_MB)
-                .dataStore(new IResponseCache())
                 .build();
 ```
 
@@ -30,7 +31,7 @@ Main purpose to use this is to
 ```
 
 ```groovy
-    // Fetch your data as a string
+    // Fetch your data as a Response
     Response response = httpClient.get(request, Response.class);
     
     // Fetch your data as a string
